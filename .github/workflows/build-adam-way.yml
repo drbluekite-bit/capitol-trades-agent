@@ -29,7 +29,10 @@ jobs:
         run: |
           SDK_ROOT="$HOME/android-sdk"
           mkdir -p "$SDK_ROOT/cmdline-tools"
-          curl -fsSL -o cmdline-tools.zip https://dl.google.com/android/repo/commandlinetools-linux-15859902_latest.zip
+          curl -fsSL https://dl.google.com/android/repo/repository2-3.xml -o repo.xml
+          ZIP_NAME=$(grep -oE 'commandlinetools-linux-[0-9]+_latest\.zip' repo.xml | head -1)
+          echo "Resolved cmdline-tools package: $ZIP_NAME"
+          curl -fsSL -o cmdline-tools.zip "https://dl.google.com/android/repo/$ZIP_NAME"
           unzip -q cmdline-tools.zip -d "$SDK_ROOT/cmdline-tools"
           mv "$SDK_ROOT/cmdline-tools/cmdline-tools" "$SDK_ROOT/cmdline-tools/latest"
           rm cmdline-tools.zip
