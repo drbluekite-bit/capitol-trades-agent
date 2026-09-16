@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Camera is used only for on-device OCR when adding an address -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+
+    <!--
+        INTERNET is used for exactly one thing: an optional lookup of a
+        what3words address to a latitude/longitude, sent directly to
+        api.what3words.com using the key you provide in Settings. No
+        analytics, ads, or other network calls exist in this app.
+    -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!--
+        Android 11+ hides other apps' presence unless declared here. These are
+        the only three apps Adam Way ever hands a route off to.
+    -->
+    <queries>
+        <package android:name="com.google.android.apps.maps" />
+        <package android:name="com.waze" />
+        <package android:name="com.what3words.android" />
+    </queries>
+
+    <application
+        android:name=".AdamWayApplication"
+        android:allowBackup="false"
+        android:fullBackupContent="@xml/backup_rules"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:theme="@style/Theme.AdamWay"
+        android:supportsRtl="true"
+        android:usesCleartextTraffic="false">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:theme="@style/Theme.AdamWay"
+            android:screenOrientation="portrait">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+
+</manifest>
