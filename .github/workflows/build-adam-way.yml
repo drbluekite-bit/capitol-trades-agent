@@ -25,21 +25,14 @@ jobs:
           java-version: '17'
           cache: gradle
 
-      - name: Install Android SDK command-line tools
-        run: |
-          SDK_ROOT="$HOME/android-sdk"
-          mkdir -p "$SDK_ROOT/cmdline-tools"
-          curl -fsSL https://dl.google.com/android/repo/repository2-3.xml -o repo.xml
-          ZIP_NAME=$(grep -oE 'commandlinetools-linux-[0-9]+_latest\.zip' repo.xml | head -1)
-          echo "Resolved cmdline-tools package: $ZIP_NAME"
-          curl -fsSL -o cmdline-tools.zip "https://dl.google.com/android/repo/$ZIP_NAME"
-          unzip -q cmdline-tools.zip -d "$SDK_ROOT/cmdline-tools"
-          mv "$SDK_ROOT/cmdline-tools/cmdline-tools" "$SDK_ROOT/cmdline-tools/latest"
-          rm cmdline-tools.zip
-          echo "ANDROID_SDK_ROOT=$SDK_ROOT" >> "$GITHUB_ENV"
-          echo "ANDROID_HOME=$SDK_ROOT" >> "$GITHUB_ENV"
-          echo "$SDK_ROOT/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
-          echo "$SDK_ROOT/platform-tools" >> "$GITHUB_PATH"
+      - name: Set up Android SDK command-line tools
+        uses: android-actions/setup-android@v3
+        with:
+          # The action's own default ("tools platform-tools") includes the
+          # legacy "tools" package, which Google has removed from the SDK
+          # repository index and which makes this action fail outright.
+          # platform-tools is all this build actually needs from it.
+          packages: platform-tools
 
       - name: Install SDK platform & build-tools
         run: |
