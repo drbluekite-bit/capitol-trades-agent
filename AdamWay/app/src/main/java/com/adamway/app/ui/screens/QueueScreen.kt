@@ -36,6 +36,7 @@ fun QueueScreen(
     onBack: () -> Unit,
     onAddAddress: () -> Unit,
     onEditAddress: () -> Unit,
+    onOpenNotes: (Long) -> Unit,
 ) {
     val queue by addressViewModel.queue.collectAsState()
     var showClearConfirm by remember { mutableStateOf(false) }
@@ -109,6 +110,7 @@ fun QueueScreen(
                             addressViewModel.startEditing(address)
                             onEditAddress()
                         },
+                        onInfo = { address.savedAddressId?.let(onOpenNotes) },
                         onMoveUp = { addressViewModel.reorder(index, index - 1) },
                         onMoveDown = { addressViewModel.reorder(index, index + 1) },
                         onDelete = { addressViewModel.deleteAddress(address) },

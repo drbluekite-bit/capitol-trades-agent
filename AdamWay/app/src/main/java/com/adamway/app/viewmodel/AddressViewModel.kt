@@ -4,6 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.adamway.app.data.Address
 import com.adamway.app.data.AddressRepository
+import com.adamway.app.data.SavedAddress
+import com.adamway.app.data.SavedAddressRepository
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -19,7 +21,10 @@ sealed class AddressEvent {
     object BlankAddress : AddressEvent()
 }
 
-class AddressViewModel(private val repository: AddressRepository) : ViewModel() {
+class AddressViewModel(
+    private val repository: AddressRepository,
+    private val savedAddressRepository: SavedAddressRepository,
+) : ViewModel() {
 
     val queue: StateFlow<List<Address>> = repository.observeQueue()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -36,9 +41,9 @@ class AddressViewModel(private val repository: AddressRepository) : ViewModel() 
         editingAddress.value = address
     }
 
-    fun addAddress(houseNumber: String, houseName: String, postcode: String, what3words: String) {
+    fun addAddress(houseNumber: String, houseName: String, postcode: String, what3words: String, savedAddressId: Long? = null) {
         viewModelScope.launch {
-            when (repository.addAddress(houseNumber, houseName, postcode, what3words)) {
+            when (repository.addAddress(houseNumber, houseName, postcode, what3words, savedAddressId)) {
                 is AddressRepository.AddResult.Success -> _events.send(AddressEvent.Added)
                 is AddressRepository.AddResult.QueueFull -> _events.send(AddressEvent.QueueFull)
                 is AddressRepository.AddResult.BlankAddress -> _events.send(AddressEvent.BlankAddress)
@@ -61,4 +66,7 @@ class AddressViewModel(private val repository: AddressRepository) : ViewModel() 
     fun clearAll() {
         viewModelScope.launch { repository.deleteAll() }
     }
+
+    /** Previously-used addresses from memory that loosely match [query], for autocomplete. */
+    suspend fun suggestAddresses(query: String): List<SavedAddress> = savedAddressRepository.search(query)
 }

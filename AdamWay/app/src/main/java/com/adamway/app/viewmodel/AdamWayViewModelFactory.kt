@@ -16,9 +16,10 @@ class AdamWayViewModelFactory(private val app: AdamWayApplication) : ViewModelPr
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>, extras: CreationExtras): T {
         return when (modelClass) {
-            AddressViewModel::class.java -> AddressViewModel(app.addressRepository) as T
+            AddressViewModel::class.java -> AddressViewModel(app.addressRepository, app.savedAddressRepository) as T
             JourneyViewModel::class.java -> JourneyViewModel(app.addressRepository, locationResolver) as T
             SettingsViewModel::class.java -> SettingsViewModel(app.settingsRepository) as T
+            SavedAddressViewModel::class.java -> SavedAddressViewModel(app.savedAddressRepository) as T
             else -> throw IllegalArgumentException("Unknown ViewModel class: $modelClass")
         }
     }

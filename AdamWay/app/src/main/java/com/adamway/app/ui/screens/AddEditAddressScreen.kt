@@ -9,15 +9,22 @@ import android.speech.RecognizerIntent
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material3.Button
@@ -37,10 +44,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import com.adamway.app.data.SavedAddress
 import com.adamway.app.ocr.AddressParser
 import com.adamway.app.viewmodel.AddressEvent
 import com.adamway.app.viewmodel.AddressViewModel
@@ -57,7 +67,27 @@ fun AddEditAddressScreen(
     var houseName by rememberSaveable(editing) { mutableStateOf(editing?.houseName ?: "") }
     var postcode by rememberSaveable(editing) { mutableStateOf(editing?.postcode ?: "") }
     var what3words by rememberSaveable(editing) { mutableStateOf(editing?.what3words ?: "") }
+    var selectedSavedAddressId by remember(editing) { mutableStateOf<Long?>(null) }
+    var suggestions by remember { mutableStateOf<List<SavedAddress>>(emptyList()) }
     var showCamera by remember { mutableStateOf(false) }
+
+    fun applySuggestion(suggestion: SavedAddress) {
+        houseNumber = suggestion.houseNumber
+        houseName = suggestion.houseName
+        postcode = suggestion.postcode
+        what3words = suggestion.what3words
+        selectedSavedAddressId = suggestion.id
+        suggestions = emptyList()
+    }
+
+    val suggestionQuery = listOf(houseNumber, houseName, postcode, what3words).filter { it.isNotBlank() }.joinToString(" ")
+    LaunchedEffect(suggestionQuery, editing) {
+        suggestions = if (editing == null && selectedSavedAddressId == null && suggestionQuery.isNotBlank()) {
+            addressViewModel.suggestAddresses(suggestionQuery)
+        } else {
+            emptyList()
+        }
+    }
     var hasCameraPermission by remember {
         mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED)
     }
@@ -85,6 +115,7 @@ fun AddEditAddressScreen(
             // rather than lose it, so the user can still see and edit what was heard.
             houseName = spoken
         }
+        selectedSavedAddressId = null
     }
 
     fun launchVoiceInput() {
@@ -123,6 +154,7 @@ fun AddEditAddressScreen(
                 if (parsed.houseNumber.isNotBlank()) houseNumber = parsed.houseNumber
                 if (parsed.houseName.isNotBlank()) houseName = parsed.houseName
                 if (parsed.postcode.isNotBlank()) postcode = parsed.postcode
+                selectedSavedAddressId = null
                 showCamera = false
             },
             onCancel = { showCamera = false },
@@ -179,39 +211,69 @@ fun AddEditAddressScreen(
 
             OutlinedTextField(
                 value = houseNumber,
-                onValueChange = { houseNumber = it },
+                onValueChange = { houseNumber = it; selectedSavedAddressId = null },
                 label = { Text("House number") },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
             )
             OutlinedTextField(
                 value = houseName,
-                onValueChange = { houseName = it },
+                onValueChange = { houseName = it; selectedSavedAddressId = null },
                 label = { Text("House name / street") },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
             )
             OutlinedTextField(
                 value = postcode,
-                onValueChange = { postcode = it },
+                onValueChange = { postcode = it; selectedSavedAddressId = null },
                 label = { Text("Postcode") },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
             )
             OutlinedTextField(
                 value = what3words,
-                onValueChange = { what3words = it },
+                onValueChange = { what3words = it; selectedSavedAddressId = null },
                 label = { Text("what3words (e.g. filled.count.soap)") },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 prefix = { Text("///") },
             )
 
+            if (suggestions.isNotEmpty()) {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        "From memory:",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
+                    )
+                    suggestions.forEach { suggestion ->
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(MaterialTheme.colorScheme.surface)
+                                .clickable { applySuggestion(suggestion) }
+                                .padding(12.dp),
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    Icons.Filled.History,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(suggestion.displayLabel, color = MaterialTheme.colorScheme.onSurface)
+                            }
+                        }
+                    }
+                }
+            }
+
             Button(
                 onClick = {
                     val current = editing
                     if (current == null) {
-                        addressViewModel.addAddress(houseNumber, houseName, postcode, what3words)
+                        addressViewModel.addAddress(houseNumber, houseName, postcode, what3words, selectedSavedAddressId)
                     } else {
                         addressViewModel.updateAddress(
                             current.copy(

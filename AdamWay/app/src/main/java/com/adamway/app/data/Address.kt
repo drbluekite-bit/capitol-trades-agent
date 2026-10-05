@@ -20,6 +20,13 @@ data class Address(
     val position: Int,
     /** Marked true once the journey has moved past this stop. */
     val visited: Boolean = false,
+    /**
+     * Links to this address's entry in the persistent address book
+     * ([SavedAddress]), where its notes and photos live. That record
+     * outlives this queue row — it's still there next time you add the
+     * same address, even after Clear Queue.
+     */
+    val savedAddressId: Long? = null,
 ) {
     val isBlank: Boolean
         get() = houseNumber.isBlank() && houseName.isBlank() && postcode.isBlank() && what3words.isBlank()

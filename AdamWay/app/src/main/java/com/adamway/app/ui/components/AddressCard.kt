@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.Card
@@ -28,6 +29,7 @@ fun AddressCard(
     canMoveUp: Boolean,
     canMoveDown: Boolean,
     onClick: () -> Unit,
+    onInfo: () -> Unit,
     onMoveUp: () -> Unit,
     onMoveDown: () -> Unit,
     onDelete: () -> Unit,
@@ -52,6 +54,9 @@ fun AddressCard(
                 address.subLabel?.let {
                     Text(it, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f), style = MaterialTheme.typography.bodyLarge)
                 }
+            }
+            IconButton(onClick = onInfo) {
+                Icon(Icons.Filled.Info, contentDescription = "Notes and photos", tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f))
             }
             IconButton(onClick = onMoveUp, enabled = canMoveUp) {
                 Icon(Icons.Filled.KeyboardArrowUp, contentDescription = "Move up")

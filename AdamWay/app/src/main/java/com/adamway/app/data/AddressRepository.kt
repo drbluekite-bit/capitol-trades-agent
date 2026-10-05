@@ -2,7 +2,10 @@ package com.adamway.app.data
 
 import kotlinx.coroutines.flow.Flow
 
-class AddressRepository(private val dao: AddressDao) {
+class AddressRepository(
+    private val dao: AddressDao,
+    private val savedAddressRepository: SavedAddressRepository,
+) {
 
     companion object {
         /** Google Maps' own address-picker tops out at 10; this is the app's overall cap. */
@@ -17,11 +20,18 @@ class AddressRepository(private val dao: AddressDao) {
 
     fun observeQueue(): Flow<List<Address>> = dao.observeAll()
 
+    /**
+     * [savedAddressId] links this queue entry to an existing address-book
+     * entry — pass it when the user picked a suggested previous address, so
+     * its notes/photos carry over instead of a new, duplicate memory entry
+     * being created.
+     */
     suspend fun addAddress(
         houseNumber: String,
         houseName: String,
         postcode: String,
         what3words: String,
+        savedAddressId: Long? = null,
     ): AddResult {
         val candidate = Address(
             houseNumber = houseNumber.trim(),
@@ -35,12 +45,23 @@ class AddressRepository(private val dao: AddressDao) {
         val existing = dao.getAll()
         if (existing.size >= MAX_QUEUE_SIZE) return AddResult.QueueFull
 
-        val id = dao.insert(candidate.copy(position = existing.size))
+        val resolvedSavedAddressId = savedAddressId
+            ?: savedAddressRepository.findOrCreate(
+                candidate.houseNumber,
+                candidate.houseName,
+                candidate.postcode,
+                candidate.what3words,
+            )
+        val id = dao.insert(candidate.copy(position = existing.size, savedAddressId = resolvedSavedAddressId))
         return AddResult.Success(id)
     }
 
     suspend fun updateAddress(address: Address) {
-        dao.update(address.copy(what3words = normalizeWhat3Words(address.what3words)))
+        val normalized = address.copy(what3words = normalizeWhat3Words(address.what3words))
+        dao.update(normalized)
+        normalized.savedAddressId?.let {
+            savedAddressRepository.syncCoreFields(it, normalized.houseNumber, normalized.houseName, normalized.postcode, normalized.what3words)
+        }
     }
 
     suspend fun deleteAddress(address: Address) {

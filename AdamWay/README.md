@@ -22,6 +22,15 @@ picker tops out at around 10. Black background, white "AW" logo.
    route on its own.
 4. A "Open next stop in Waze" shortcut and automatic What3Words handoff
    are available per stop as alternatives.
+5. **Adam Way remembers addresses you've used before.** As you start
+   typing a new one, matching past addresses show up under "From memory" —
+   tap one to fill in the form instantly. That memory is separate from the
+   current queue, so it survives Clear Queue.
+6. Each address in the queue has an info (ⓘ) button that opens its **notes
+   and photos** — a free-text note plus any photos you've taken against it
+   (parking instructions, a gate code, which door to use, etc.). These are
+   attached to the address in memory, not just this one trip, so they're
+   still there next time it comes up.
 
 ## Why "Arrived – Next Stop" is a button, not automatic
 
@@ -58,9 +67,15 @@ or background service.
 
 ## Privacy
 
-- The address queue lives in a local SQLite database on your phone only
-  (Room). `android:allowBackup="false"` and explicit backup-exclusion
-  rules keep it out of cloud/device backups too.
+- The address queue, address memory, and all notes live in a local SQLite
+  database on your phone only (Room). `android:allowBackup="false"` and
+  explicit backup-exclusion rules keep it out of cloud/device backups too.
+- Note photos are taken with the phone's own camera app (via an
+  `ACTION_IMAGE_CAPTURE` intent — Adam Way doesn't request the camera
+  permission for this and never previews/records anything itself) and the
+  result is saved straight into this app's private internal storage, never
+  external/shared storage. Deleting a photo from an address's notes deletes
+  that file immediately.
 - Camera photos are decoded straight into memory, run through Google's
   **on-device, bundled** ML Kit text recognizer (the model ships inside
   the app — no network call, nothing sent to Google), and then discarded.

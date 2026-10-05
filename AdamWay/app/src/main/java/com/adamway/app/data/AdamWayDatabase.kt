@@ -5,9 +5,10 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 
-@Database(entities = [Address::class], version = 1, exportSchema = false)
+@Database(entities = [Address::class, SavedAddress::class], version = 2, exportSchema = false)
 abstract class AdamWayDatabase : RoomDatabase() {
     abstract fun addressDao(): AddressDao
+    abstract fun savedAddressDao(): SavedAddressDao
 
     companion object {
         @Volatile
@@ -19,7 +20,11 @@ abstract class AdamWayDatabase : RoomDatabase() {
                     context.applicationContext,
                     AdamWayDatabase::class.java,
                     "adam-way.db",
-                ).build().also { instance = it }
+                )
+                    // This app has no release users yet, so a schema bump just
+                    // resets local data rather than needing a real migration.
+                    .fallbackToDestructiveMigration()
+                    .build().also { instance = it }
             }
     }
 }
