@@ -21,6 +21,10 @@
         <package android:name="com.google.android.apps.maps" />
         <package android:name="com.waze" />
         <package android:name="com.what3words.android" />
+        <!-- Lets the "Speak address" button find the device's speech-to-text app -->
+        <intent>
+            <action android:name="android.speech.action.RECOGNIZE_SPEECH" />
+        </intent>
     </queries>
 
     <application

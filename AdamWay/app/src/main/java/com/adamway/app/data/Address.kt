@@ -24,12 +24,32 @@ data class Address(
     val isBlank: Boolean
         get() = houseNumber.isBlank() && houseName.isBlank() && postcode.isBlank() && what3words.isBlank()
 
-    /** Free-text line built from the postal fields, for use as a Google Maps search query. */
+    /**
+     * Free-text line built from the postal fields, for use as a Google Maps search query.
+     *
+     * Google's geocoder treats a comma as a separator between distinct place
+     * components, so joining everything with ", " (e.g. "24, BL8 3LB") makes
+     * it read "24" as its own place — which isn't one — and it can fall back
+     * to an approximate match instead of the actual house. A bare house
+     * number next to a postcode needs to read as a single compound address
+     * ("24 BL8 3LB", space-joined) the way someone would actually type it;
+     * a house number with a street name is joined the same way and then
+     * comma-separated from the postcode ("24 Sandybrook Close, BL8 3LB").
+     */
     val postalQuery: String
-        get() = listOf(houseNumber, houseName, postcode)
-            .map { it.trim() }
-            .filter { it.isNotEmpty() }
-            .joinToString(", ")
+        get() {
+            val number = houseNumber.trim()
+            val street = houseName.trim()
+            val pc = postcode.trim()
+            val numberAndStreet = listOf(number, street).filter { it.isNotEmpty() }.joinToString(" ")
+            return when {
+                street.isNotEmpty() && pc.isNotEmpty() -> "$numberAndStreet, $pc"
+                street.isNotEmpty() -> numberAndStreet
+                pc.isNotEmpty() && number.isNotEmpty() -> "$number $pc"
+                pc.isNotEmpty() -> pc
+                else -> number
+            }
+        }
 
     /** A short label for lists: prefers the house name, falls back to whatever is set. */
     val displayLabel: String

@@ -8,6 +8,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -18,11 +19,15 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.adamway.app.data.AddressRepository
 import com.adamway.app.ui.components.AddressCard
+import com.adamway.app.ui.components.ConfirmDialog
 import com.adamway.app.viewmodel.AddressViewModel
 
 @Composable
@@ -33,6 +38,20 @@ fun QueueScreen(
     onEditAddress: () -> Unit,
 ) {
     val queue by addressViewModel.queue.collectAsState()
+    var showClearConfirm by remember { mutableStateOf(false) }
+
+    if (showClearConfirm) {
+        ConfirmDialog(
+            title = "Clear entire queue?",
+            message = "This removes all ${queue.size} queued addresses. This can't be undone.",
+            confirmLabel = "Clear queue",
+            onConfirm = {
+                addressViewModel.clearAll()
+                showClearConfirm = false
+            },
+            onDismiss = { showClearConfirm = false },
+        )
+    }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -42,6 +61,13 @@ fun QueueScreen(
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.Filled.ArrowBack, contentDescription = "Back", tint = MaterialTheme.colorScheme.onBackground)
+                    }
+                },
+                actions = {
+                    if (queue.isNotEmpty()) {
+                        IconButton(onClick = { showClearConfirm = true }) {
+                            Icon(Icons.Filled.DeleteSweep, contentDescription = "Clear queue", tint = MaterialTheme.colorScheme.onBackground)
+                        }
                     }
                 },
                 colors = androidx.compose.material3.TopAppBarDefaults.topAppBarColors(

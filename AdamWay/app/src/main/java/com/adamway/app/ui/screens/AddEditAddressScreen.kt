@@ -1,7 +1,11 @@
 package com.adamway.app.ui.screens
 
 import android.Manifest
+import android.app.Activity
+import android.content.ActivityNotFoundException
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.speech.RecognizerIntent
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -14,6 +18,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
@@ -36,6 +41,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import com.adamway.app.ocr.AddressParser
 import com.adamway.app.viewmodel.AddressEvent
 import com.adamway.app.viewmodel.AddressViewModel
 
@@ -59,6 +65,38 @@ fun AddEditAddressScreen(
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         hasCameraPermission = granted
         if (granted) showCamera = true
+    }
+
+    val voiceLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        if (result.resultCode != Activity.RESULT_OK) return@rememberLauncherForActivityResult
+        val spoken = result.data
+            ?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
+            ?.firstOrNull()
+        if (spoken.isNullOrBlank()) {
+            Toast.makeText(context, "Didn't catch that — try again", Toast.LENGTH_SHORT).show()
+            return@rememberLauncherForActivityResult
+        }
+        val parsed = AddressParser.parse(spoken)
+        if (parsed.houseNumber.isNotBlank()) houseNumber = parsed.houseNumber
+        if (parsed.houseName.isNotBlank()) houseName = parsed.houseName
+        if (parsed.postcode.isNotBlank()) postcode = parsed.postcode
+        if (parsed.houseNumber.isBlank() && parsed.houseName.isBlank() && parsed.postcode.isBlank()) {
+            // Couldn't pick out a number/postcode — drop the raw transcript into house name
+            // rather than lose it, so the user can still see and edit what was heard.
+            houseName = spoken
+        }
+    }
+
+    fun launchVoiceInput() {
+        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            putExtra(RecognizerIntent.EXTRA_PROMPT, "Speak the address")
+        }
+        try {
+            voiceLauncher.launch(intent)
+        } catch (e: ActivityNotFoundException) {
+            Toast.makeText(context, "No speech recognizer app found on this device", Toast.LENGTH_LONG).show()
+        }
     }
 
     LaunchedEffect(Unit) {
@@ -129,6 +167,14 @@ fun AddEditAddressScreen(
             ) {
                 Icon(Icons.Filled.PhotoCamera, contentDescription = null)
                 Text("  Scan with camera")
+            }
+
+            OutlinedButton(
+                onClick = { launchVoiceInput() },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Icon(Icons.Filled.Mic, contentDescription = null)
+                Text("  Speak address")
             }
 
             OutlinedTextField(

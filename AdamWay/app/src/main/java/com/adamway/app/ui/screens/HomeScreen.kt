@@ -17,16 +17,21 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.adamway.app.data.AddressRepository
 import com.adamway.app.ui.components.AdamWayLogo
+import com.adamway.app.ui.components.ConfirmDialog
 import com.adamway.app.viewmodel.AddressViewModel
 
 @Composable
@@ -37,6 +42,20 @@ fun HomeScreen(
     onOpenSettings: () -> Unit,
 ) {
     val queue by addressViewModel.queue.collectAsState()
+    var showClearConfirm by remember { mutableStateOf(false) }
+
+    if (showClearConfirm) {
+        ConfirmDialog(
+            title = "Clear entire queue?",
+            message = "This removes all ${queue.size} queued addresses. This can't be undone.",
+            confirmLabel = "Clear queue",
+            onConfirm = {
+                addressViewModel.clearAll()
+                showClearConfirm = false
+            },
+            onDismiss = { showClearConfirm = false },
+        )
+    }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -91,6 +110,13 @@ fun HomeScreen(
                 modifier = Modifier.fillMaxWidth().height(56.dp),
             ) {
                 Text("Manage Address Queue")
+            }
+
+            if (queue.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(16.dp))
+                TextButton(onClick = { showClearConfirm = true }) {
+                    Text("Clear Queue", color = MaterialTheme.colorScheme.error)
+                }
             }
         }
     }

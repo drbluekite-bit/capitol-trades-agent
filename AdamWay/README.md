@@ -6,11 +6,13 @@ picker tops out at around 10. Black background, white "AW" logo.
 
 ## What it does
 
-1. **Add addresses** to a queue (up to 18), manually or by photographing
-   one (house number/name, postcode, plaque, etc.) and letting on-device
-   text recognition pre-fill the form for you to check and correct.
-   Every field — house number, house name, postcode, what3words — is
-   optional on its own; you just need at least one filled in per address.
+1. **Add addresses** to a queue (up to 18), manually, by photographing one
+   (house number/name, postcode, plaque, etc.) and letting on-device text
+   recognition pre-fill the form, or by tapping **Speak address** and
+   saying it out loud. Every field — house number, house name, postcode,
+   what3words — is optional on its own; you just need at least one filled
+   in per address. The Queue screen and the home screen both have a
+   **Clear queue** action for starting over.
 2. **Begin Journey** sends the first 5 addresses to Google Maps as a single
    multi-stop route.
 3. Each time you tap **Arrived – Next Stop** in Adam Way (after leaving
@@ -63,6 +65,13 @@ or background service.
   **on-device, bundled** ML Kit text recognizer (the model ships inside
   the app — no network call, nothing sent to Google), and then discarded.
   Nothing is written to disk or shared.
+- **Speak address** launches the phone's own system speech-to-text app
+  (via `RecognizerIntent`) rather than Adam Way doing any recording or
+  recognition itself — the same thing your keyboard's microphone button
+  uses. Adam Way never requests the microphone permission and never
+  touches the audio; it only receives the resulting text back. What that
+  system app does with the recording (on-device vs. a cloud speech
+  service) is up to your phone/Google Assistant settings, not this app.
 - The what3words API key is stored in an Android Keystore-backed
   `EncryptedSharedPreferences` file.
 - The only network calls the app ever makes: (1) the optional
@@ -75,12 +84,14 @@ or background service.
 
 ## Building it
 
-This was written from a sandboxed environment with no Android SDK and no
-access to Google's Maven repository (`dl.google.com` is blocked here), so
-it has **not** been compiled in this session — open it in Android Studio
-(Koala/Ladybird or newer) on your own machine, which will fetch the
-Android Gradle Plugin, SDK platform 34, and the other Google-hosted
-dependencies automatically, then Build → Run.
+The authoring sandbox has no Android SDK and no access to Google's Maven
+repository, so it can't build locally there. CI (`.github/workflows/build-adam-way.yml`)
+builds a debug APK on every push and publishes it as both a workflow
+artifact and a GitHub Release — grab the latest from the repo's Releases
+page. To build it yourself, open `AdamWay/` in Android Studio (Koala/
+Ladybird or newer), which will fetch the Android Gradle Plugin, SDK
+platform 34, and the other Google-hosted dependencies automatically, then
+Build → Run.
 
 - **Language/UI:** Kotlin, Jetpack Compose, Material 3
 - **Min/target SDK:** 26 / 34
