@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="adam_way_black">#FF000000</color>
+    <color name="adam_way_white">#FFFFFFFF</color>
+    <color name="adam_way_grey">#FF1C1C1E</color>
+    <color name="adam_way_accent">#FF4DA6FF</color>
+</resources>
