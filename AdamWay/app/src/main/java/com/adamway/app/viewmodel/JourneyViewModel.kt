@@ -11,6 +11,7 @@ import com.adamway.app.journey.JourneyWindow
 import com.adamway.app.location.AddressLocationResolver
 import com.adamway.app.location.ResolvedStop
 import com.adamway.app.maps.MapsLauncher
+import com.adamway.app.maps.MapsStop
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -104,18 +105,18 @@ class JourneyViewModel(
 
     private suspend fun launchWindow(context: Context, window: JourneyWindow) {
         val resolved = locationResolver.resolveAll(window.stops)
-        val stopStrings = mutableListOf<String>()
+        val mapsStops = mutableListOf<MapsStop>()
         val warnings = mutableListOf<String>()
         for (stop in resolved) {
             when (stop) {
-                is ResolvedStop.Coordinates -> stopStrings += "${stop.latLng.lat},${stop.latLng.lng}"
-                is ResolvedStop.TextQuery -> stopStrings += stop.query
+                is ResolvedStop.Coordinates -> mapsStops += MapsStop.Coordinate(stop.latLng.lat, stop.latLng.lng)
+                is ResolvedStop.TextQuery -> mapsStops += MapsStop.Text(stop.query)
                 is ResolvedStop.Unresolved -> warnings += "${stop.address.displayLabel}: ${stop.reason}"
             }
         }
         _uiState.value = JourneyUiState.Active(window, fullQueueSnapshot.size, warnings)
-        if (stopStrings.isNotEmpty()) {
-            MapsLauncher.openGoogleMapsRoute(context, stopStrings)
+        if (mapsStops.isNotEmpty()) {
+            MapsLauncher.openGoogleMapsRoute(context, mapsStops)
         }
     }
 }

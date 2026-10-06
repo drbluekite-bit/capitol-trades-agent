@@ -6,6 +6,12 @@ import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
 
+/** A single leg of a Maps route: either a resolved point or a free-text search. */
+sealed class MapsStop {
+    data class Coordinate(val lat: Double, val lng: Double) : MapsStop()
+    data class Text(val query: String) : MapsStop()
+}
+
 /**
  * Builds and fires the Android intents that hand a leg of the journey off
  * to Google Maps, Waze, or What3Words. No Maps/Directions API key is used —
@@ -20,20 +26,33 @@ object MapsLauncher {
      * destination, everything before it becomes a waypoint. Origin is left
      * out so Maps starts from the phone's current location.
      */
-    fun openGoogleMapsRoute(context: Context, stops: List<String>) {
+    fun openGoogleMapsRoute(context: Context, stops: List<MapsStop>) {
         require(stops.isNotEmpty()) { "Need at least one stop" }
-        val destination = Uri.encode(stops.last())
+        val destination = encodeStop(stops.last())
         val waypoints = stops.dropLast(1)
 
         val builder = StringBuilder("https://www.google.com/maps/dir/?api=1")
         builder.append("&destination=").append(destination)
         if (waypoints.isNotEmpty()) {
-            val encodedWaypoints = waypoints.joinToString("|") { Uri.encode(it) }
+            val encodedWaypoints = waypoints.joinToString("|") { encodeStop(it) }
             builder.append("&waypoints=").append(encodedWaypoints)
         }
         builder.append("&travelmode=driving")
 
         launch(context, builder.toString(), "com.google.android.apps.maps")
+    }
+
+    /**
+     * Google's documented Maps URL format expects a literal, unencoded
+     * comma for a "lat,lng" coordinate pair — percent-encoding it to %2C
+     * (which a blanket Uri.encode() would do) makes the Maps app reject
+     * the link outright ("This type of link isn't supported"). Free-text
+     * addresses, on the other hand, need full encoding for spaces, commas
+     * within the address itself, etc.
+     */
+    private fun encodeStop(stop: MapsStop): String = when (stop) {
+        is MapsStop.Coordinate -> "${stop.lat},${stop.lng}"
+        is MapsStop.Text -> Uri.encode(stop.query)
     }
 
     /** Waze only supports a single destination per link, so this is used for the next stop only. */
