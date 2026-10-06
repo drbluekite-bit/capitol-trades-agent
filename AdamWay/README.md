@@ -48,16 +48,23 @@ or background service.
 
 - **No Google Maps/Directions API key, ever.** Routes are opened with a
   plain `https://www.google.com/maps/dir/?api=1&...` deep link (an Intent),
-  which is free and doesn't require any API key or billing account. The
-  trade-off is that Adam Way can't validate an address before sending it —
-  Maps does its own geocoding when it opens.
-- **what3words is optional and needs your own free API key.** A postcode
-  or house address is passed to Maps as plain text and geocoded by Maps
-  itself for free. A `///three.word.address`, though, means nothing to
-  Google Maps — so if you want a what3words-only stop to be included in
-  the *same* multi-stop Maps route as your other addresses, Adam Way
-  converts it to a latitude/longitude first via the what3words API
-  (`api.what3words.com`), which requires a free personal API key from
+  which is free and doesn't require any API key or billing account.
+- **Postal addresses are geocoded to coordinates before Maps ever sees
+  them.** Early on this app just handed Maps a free-text address (e.g.
+  "49 S35 4DE") as a waypoint and let Maps geocode it — but Maps' own
+  free-text waypoint geocoder turned out to be unreliable for a bare house
+  number plus postcode with no street name: it can snap to the general
+  area of the postcode rather than the actual building. So Adam Way now
+  resolves every postal address to a precise latitude/longitude itself
+  first, via OpenStreetMap's free Nominatim search API (no key, no
+  billing account), and only sends Maps a plain-text search as a fallback
+  if that lookup fails (e.g. no signal).
+- **what3words is optional and needs your own free API key.** A
+  `///three.word.address` means nothing to Google Maps or to Nominatim —
+  so if you want a what3words-only stop included in the *same* multi-stop
+  Maps route as your other addresses, Adam Way converts it to a
+  latitude/longitude first via the what3words API (`api.what3words.com`),
+  which requires a free personal API key from
   [developer.what3words.com](https://developer.what3words.com). Add it in
   Settings. Without a key, a what3words-only stop instead opens directly
   in the What3Words app when it's your next stop.
@@ -89,12 +96,17 @@ or background service.
   service) is up to your phone/Google Assistant settings, not this app.
 - The what3words API key is stored in an Android Keystore-backed
   `EncryptedSharedPreferences` file.
-- The only network calls the app ever makes: (1) the optional
-  `api.what3words.com` coordinate lookup, sent only when a queued address
-  has a what3words value and only with your own key, and (2) handing a
-  route off to Google Maps, Waze, or What3Words via an Android Intent when
-  you tap a navigation button — at that point your route data goes
-  directly from the OS to that app, not through any server of ours.
+- The only network calls the app ever makes: (1) geocoding a queued postal
+  address via `nominatim.openstreetmap.org` (OpenStreetMap's free
+  service — see their
+  [privacy policy](https://osmfoundation.org/wiki/Privacy_Policy) for how
+  they handle requests) so it can be placed precisely on the route, (2)
+  the optional `api.what3words.com` coordinate lookup, sent only when a
+  queued address has a what3words value and only with your own key, and
+  (3) handing a route off to Google Maps, Waze, or What3Words via an
+  Android Intent when you tap a navigation button — at that point your
+  route data goes directly from the OS to that app, not through any
+  server of ours.
 - No analytics, ads, crash reporting, or other third-party SDKs.
 
 ## Building it
@@ -112,8 +124,8 @@ Build → Run.
 - **Min/target SDK:** 26 / 34
 - **Persistence:** Room (local only)
 - **Camera/OCR:** CameraX + ML Kit Text Recognition (bundled/on-device model)
-- **Networking:** OkHttp + kotlinx.serialization, used only for the
-  optional what3words lookup
+- **Networking:** OkHttp + kotlinx.serialization — geocoding postal
+  addresses (OpenStreetMap Nominatim) and the optional what3words lookup
 
 ```
 AdamWay/
