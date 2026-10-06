@@ -58,7 +58,11 @@ or background service.
   resolves every postal address to a precise latitude/longitude itself
   first, via OpenStreetMap's free Nominatim search API (no key, no
   billing account), and only sends Maps a plain-text search as a fallback
-  if that lookup fails (e.g. no signal).
+  if that lookup fails (e.g. no signal). Geocoding is restricted to Great
+  Britain (Adam Way's address parsing already assumes UK postcodes) —
+  without that restriction, a short or slightly ambiguous query could
+  match Nominatim's best global guess instead of a clean "no match",
+  which was once literally a street in Mongolia for a Rotherham address.
 - **what3words is optional and needs your own free API key.** A
   `///three.word.address` means nothing to Google Maps or to Nominatim —
   so if you want a what3words-only stop included in the *same* multi-stop

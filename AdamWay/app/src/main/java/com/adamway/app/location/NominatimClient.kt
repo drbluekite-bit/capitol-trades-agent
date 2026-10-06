@@ -22,6 +22,9 @@ sealed class GeocodeResult {
  * name): it can snap to the postcode's general area instead of the actual
  * building. Resolving to coordinates ourselves first, the same way
  * what3words addresses already are, sidesteps that.
+ *
+ * Results are restricted to Great Britain (see [geocode]) since this app's
+ * address parsing already assumes UK postcodes.
  */
 class NominatimClient {
 
@@ -37,6 +40,14 @@ class NominatimClient {
             .addQueryParameter("q", query)
             .addQueryParameter("format", "jsonv2")
             .addQueryParameter("limit", "1")
+            // Without a country restriction, a short or slightly ambiguous
+            // query (e.g. just a house number/postcode fragment that didn't
+            // parse quite right) can match Nominatim's best global guess
+            // instead of a "no match" — which can be a street on the other
+            // side of the world. Adam Way's address parsing already assumes
+            // UK postcodes, so biasing/limiting results to Great Britain
+            // rules that out rather than relying on ranking alone.
+            .addQueryParameter("countrycodes", "gb")
             .build()
 
         val request = Request.Builder()
