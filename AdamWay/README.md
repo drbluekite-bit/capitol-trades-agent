@@ -120,6 +120,15 @@ Ladybird or newer), which will fetch the Android Gradle Plugin, SDK
 platform 34, and the other Google-hosted dependencies automatically, then
 Build → Run.
 
+Debug builds are signed with the fixed, checked-in `keystore/debug.keystore`
+(a standard, non-secret debug-only key — never used for a release build)
+rather than each machine's own auto-generated one, specifically so CI
+builds from different runs — and different CI runners — can install over
+each other as updates. **If you installed an APK from a CI build before
+this keystore was pinned, Android will refuse to install over it** (it
+looks like a different app once the signing key changes); uninstall the
+old copy once, then every build from here on updates normally.
+
 - **Language/UI:** Kotlin, Jetpack Compose, Material 3
 - **Min/target SDK:** 26 / 34
 - **Persistence:** Room (local only)

@@ -13,11 +13,31 @@ android {
         applicationId = "com.adamway.app"
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "1.1"
+    }
+
+    signingConfigs {
+        getByName("debug") {
+            // Pinned rather than left to each machine's auto-generated
+            // ~/.android/debug.keystore: CI runs on a fresh, ephemeral
+            // machine every time, so an unpinned debug key would be
+            // different on every build. Android treats a different
+            // signing key as a different app and refuses to install an
+            // "update" over whatever's already on the phone — so without
+            // this, every CI-built APK silently fails to replace the
+            // previous one unless it's uninstalled first.
+            storeFile = file("../keystore/debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
     }
 
     buildTypes {
+        debug {
+            signingConfig = signingConfigs.getByName("debug")
+        }
         release {
             isMinifyEnabled = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
