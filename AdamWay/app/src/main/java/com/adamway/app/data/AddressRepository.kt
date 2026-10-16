@@ -24,7 +24,9 @@ class AddressRepository(
      * [savedAddressId] links this queue entry to an existing address-book
      * entry — pass it when the user picked a suggested previous address, so
      * its notes/photos carry over instead of a new, duplicate memory entry
-     * being created.
+     * being created. [resolvedLat]/[resolvedLng] is a location the user
+     * confirmed themselves from the address search results; passed through
+     * to the new address-book entry so it never needs geocoding again.
      */
     suspend fun addAddress(
         houseNumber: String,
@@ -32,6 +34,8 @@ class AddressRepository(
         postcode: String,
         what3words: String,
         savedAddressId: Long? = null,
+        resolvedLat: Double? = null,
+        resolvedLng: Double? = null,
     ): AddResult {
         val candidate = Address(
             houseNumber = houseNumber.trim(),
@@ -51,16 +55,26 @@ class AddressRepository(
                 candidate.houseName,
                 candidate.postcode,
                 candidate.what3words,
+                resolvedLat,
+                resolvedLng,
             )
         val id = dao.insert(candidate.copy(position = existing.size, savedAddressId = resolvedSavedAddressId))
         return AddResult.Success(id)
     }
 
-    suspend fun updateAddress(address: Address) {
+    suspend fun updateAddress(address: Address, resolvedLat: Double? = null, resolvedLng: Double? = null) {
         val normalized = address.copy(what3words = normalizeWhat3Words(address.what3words))
         dao.update(normalized)
         normalized.savedAddressId?.let {
-            savedAddressRepository.syncCoreFields(it, normalized.houseNumber, normalized.houseName, normalized.postcode, normalized.what3words)
+            savedAddressRepository.syncCoreFields(
+                it,
+                normalized.houseNumber,
+                normalized.houseName,
+                normalized.postcode,
+                normalized.what3words,
+                resolvedLat,
+                resolvedLng,
+            )
         }
     }
 

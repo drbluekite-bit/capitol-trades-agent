@@ -13,6 +13,10 @@ picker tops out at around 10. Black background, white "AW" logo.
    what3words — is optional on its own; you just need at least one filled
    in per address. The Queue screen and the home screen both have a
    **Clear queue** action for starting over.
+   As you type a number and street, **matching addresses** show up below
+   the form — the same way typing into Google Maps' own search bar brings
+   up a results list — so you pick the exact one yourself instead of Adam
+   Way silently geocoding and hoping it guessed right.
 2. **Begin Journey** sends the first 5 addresses to Google Maps as a single
    multi-stop route.
 3. Each time you tap **Arrived – Next Stop** in Adam Way (after leaving
@@ -49,20 +53,22 @@ or background service.
 - **No Google Maps/Directions API key, ever.** Routes are opened with a
   plain `https://www.google.com/maps/dir/?api=1&...` deep link (an Intent),
   which is free and doesn't require any API key or billing account.
-- **Postal addresses are geocoded to coordinates before Maps ever sees
-  them.** Early on this app just handed Maps a free-text address (e.g.
-  "49 S35 4DE") as a waypoint and let Maps geocode it — but Maps' own
-  free-text waypoint geocoder turned out to be unreliable for a bare house
-  number plus postcode with no street name: it can snap to the general
-  area of the postcode rather than the actual building. So Adam Way now
-  resolves every postal address to a precise latitude/longitude itself
-  first, via OpenStreetMap's free Nominatim search API (no key, no
-  billing account), and only sends Maps a plain-text search as a fallback
-  if that lookup fails (e.g. no signal). Geocoding is restricted to Great
-  Britain (Adam Way's address parsing already assumes UK postcodes) —
-  without that restriction, a short or slightly ambiguous query could
-  match Nominatim's best global guess instead of a clean "no match",
-  which was once literally a street in Mongolia for a Rotherham address.
+- **You confirm the exact address yourself — Adam Way doesn't silently
+  geocode and guess.** This app went through a few iterations that all
+  tried to resolve a typed address to coordinates automatically (first
+  handing Maps free text and letting it geocode; then geocoding with
+  OpenStreetMap's free Nominatim search API instead). Both can still get
+  it wrong for a short or ambiguous query — one sent a Rotherham address
+  to a street in Mongolia. So the Add/Edit screen now surfaces Nominatim's
+  results as a **pick list** instead of auto-selecting the top match:
+  type a number and street, see real candidate addresses, tap the correct
+  one. That confirmed coordinate is stored against the address and reused
+  at journey time — no further geocoding, no further guessing. Addresses
+  added without using the search (plain manual entry, or ones added
+  before this existed) still fall back to an automatic best-guess geocode
+  at journey time, restricted to Great Britain since this app's address
+  parsing already assumes UK postcodes — but confirming via search is the
+  reliable path.
 - **what3words is optional and needs your own free API key.** A
   `///three.word.address` means nothing to Google Maps or to Nominatim —
   so if you want a what3words-only stop included in the *same* multi-stop
@@ -72,9 +78,12 @@ or background service.
   [developer.what3words.com](https://developer.what3words.com). Add it in
   Settings. Without a key, a what3words-only stop instead opens directly
   in the What3Words app when it's your next stop.
-- **Waze is single-stop only.** Waze's own deep link scheme doesn't support
-  multiple waypoints, so it's offered as a per-stop shortcut, not for the
-  whole journey.
+- **Choosing Google Maps or Waze per stop.** The whole multi-stop journey
+  always goes through Google Maps, since Waze's own deep link scheme
+  doesn't support multiple waypoints at all — there's no way to hand it an
+  18-stop route. But every leg of the journey also has an "Open next stop
+  in Waze" button right alongside the automatic Maps launch, so you can
+  use Waze for whichever single stop you actually want it for.
 
 ## Privacy
 
@@ -100,11 +109,13 @@ or background service.
   service) is up to your phone/Google Assistant settings, not this app.
 - The what3words API key is stored in an Android Keystore-backed
   `EncryptedSharedPreferences` file.
-- The only network calls the app ever makes: (1) geocoding a queued postal
+- The only network calls the app ever makes: (1) searching/geocoding an
   address via `nominatim.openstreetmap.org` (OpenStreetMap's free
   service — see their
   [privacy policy](https://osmfoundation.org/wiki/Privacy_Policy) for how
-  they handle requests) so it can be placed precisely on the route, (2)
+  they handle requests), sent as you type in the Add/Edit screen (so you
+  can pick the right address) and, for unconfirmed addresses only, again
+  at journey time, (2)
   the optional `api.what3words.com` coordinate lookup, sent only when a
   queued address has a what3words value and only with your own key, and
   (3) handing a route off to Google Maps, Waze, or What3Words via an

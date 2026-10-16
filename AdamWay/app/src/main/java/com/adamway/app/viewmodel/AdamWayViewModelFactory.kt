@@ -10,7 +10,10 @@ import com.adamway.app.location.What3WordsClient
 class AdamWayViewModelFactory(private val app: AdamWayApplication) : ViewModelProvider.Factory {
 
     private val locationResolver by lazy {
-        AddressLocationResolver(What3WordsClient { app.settingsRepository.what3wordsApiKey.value })
+        AddressLocationResolver(
+            What3WordsClient { app.settingsRepository.what3wordsApiKey.value },
+            app.savedAddressRepository,
+        )
     }
 
     @Suppress("UNCHECKED_CAST")

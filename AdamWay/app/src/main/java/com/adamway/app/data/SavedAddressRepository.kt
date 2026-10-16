@@ -25,12 +25,30 @@ class SavedAddressRepository(private val dao: SavedAddressDao) {
     /**
      * Finds the saved address matching these details, refreshing its
      * "last used" time, or creates a new one if this is the first time
-     * this address has been added.
+     * this address has been added. [resolvedLat]/[resolvedLng], when
+     * given, is a location the user just picked themselves from the
+     * address search suggestions — a fresh confirmed pick always replaces
+     * whatever was stored before (even on an existing match), since it's
+     * more trustworthy than anything guessed automatically; passing null
+     * for both (a plain manual edit with no new pick) leaves it as is.
      */
-    suspend fun findOrCreate(houseNumber: String, houseName: String, postcode: String, what3words: String): Long {
+    suspend fun findOrCreate(
+        houseNumber: String,
+        houseName: String,
+        postcode: String,
+        what3words: String,
+        resolvedLat: Double? = null,
+        resolvedLng: Double? = null,
+    ): Long {
         val match = dao.getAll().firstOrNull { it.matches(houseNumber, houseName, postcode, what3words) }
         return if (match != null) {
-            dao.upsert(match.copy(lastUsedAt = System.currentTimeMillis()))
+            dao.upsert(
+                match.copy(
+                    lastUsedAt = System.currentTimeMillis(),
+                    resolvedLat = resolvedLat ?: match.resolvedLat,
+                    resolvedLng = resolvedLng ?: match.resolvedLng,
+                )
+            )
             match.id
         } else {
             dao.upsert(
@@ -39,13 +57,28 @@ class SavedAddressRepository(private val dao: SavedAddressDao) {
                     houseName = houseName.trim(),
                     postcode = postcode.trim(),
                     what3words = what3words.trim(),
+                    resolvedLat = resolvedLat,
+                    resolvedLng = resolvedLng,
                 )
             )
         }
     }
 
-    /** Keeps the address book's core fields in sync when a queued address is edited. */
-    suspend fun syncCoreFields(id: Long, houseNumber: String, houseName: String, postcode: String, what3words: String) {
+    /**
+     * Keeps the address book's core fields in sync when a queued address is
+     * edited. A fresh [resolvedLat]/[resolvedLng] (the user re-confirmed the
+     * address from search results) replaces any previous one; passing null
+     * for both leaves whatever location was already stored untouched.
+     */
+    suspend fun syncCoreFields(
+        id: Long,
+        houseNumber: String,
+        houseName: String,
+        postcode: String,
+        what3words: String,
+        resolvedLat: Double? = null,
+        resolvedLng: Double? = null,
+    ) {
         val existing = dao.getById(id) ?: return
         dao.upsert(
             existing.copy(
@@ -53,6 +86,8 @@ class SavedAddressRepository(private val dao: SavedAddressDao) {
                 houseName = houseName.trim(),
                 postcode = postcode.trim(),
                 what3words = what3words.trim(),
+                resolvedLat = resolvedLat ?: existing.resolvedLat,
+                resolvedLng = resolvedLng ?: existing.resolvedLng,
             )
         )
     }

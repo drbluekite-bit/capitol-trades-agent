@@ -20,8 +20,20 @@ data class SavedAddress(
     val notes: String = "",
     /** Local file paths of photos attached to this address's notes, [PHOTO_PATH_DELIMITER]-separated. */
     val notePhotoPaths: String = "",
+    /**
+     * A precise location the user picked themselves from the address
+     * search suggestions (or a what3words lookup), rather than one Adam
+     * Way guessed automatically. When set, this is used directly at
+     * journey time instead of re-geocoding — it's the whole point of
+     * letting you confirm the exact address up front.
+     */
+    val resolvedLat: Double? = null,
+    val resolvedLng: Double? = null,
     val lastUsedAt: Long = System.currentTimeMillis(),
 ) {
+    val hasConfirmedLocation: Boolean
+        get() = resolvedLat != null && resolvedLng != null
+
     val photoPathList: List<String>
         get() = notePhotoPaths.split(PHOTO_PATH_DELIMITER).filter { it.isNotBlank() }
 
