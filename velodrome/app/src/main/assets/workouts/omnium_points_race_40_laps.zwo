@@ -1,0 +1,28 @@
+<workout_file>
+  <author>Velodrome Ghost</author>
+  <name>Omnium Points Race - 40 laps</name>
+  <description>10 km points race pacing: long flat tempo blocks at 85% FTP with a hard surge where each sprint falls (every 10 laps at about 40 km/h). Turn on "Ghost attacks sprints" so the ghost also kicks exactly at each sprint line.</description>
+  <sportType>bike</sportType>
+  <tags>
+    <tag name="TRACK"/>
+    <tag name="OMNIUM"/>
+  </tags>
+  <workout>
+    <SteadyState Duration="200" Power="0.85" Cadence="95">
+      <textevent timeoffset="2" message="Settle in - first sprint in 10 laps"/>
+    </SteadyState>
+    <SteadyState Duration="20" Power="1.50" Cadence="115"/>
+    <SteadyState Duration="30" Power="0.70" Cadence="90"/>
+    <SteadyState Duration="170" Power="0.85" Cadence="95"/>
+    <SteadyState Duration="20" Power="1.50" Cadence="115"/>
+    <SteadyState Duration="30" Power="0.70" Cadence="90"/>
+    <SteadyState Duration="170" Power="0.88" Cadence="96"/>
+    <SteadyState Duration="20" Power="1.50" Cadence="115"/>
+    <SteadyState Duration="30" Power="0.70" Cadence="90"/>
+    <SteadyState Duration="150" Power="0.90" Cadence="98">
+      <textevent timeoffset="2" message="Last block - final sprint is double points"/>
+    </SteadyState>
+    <MaxEffort Duration="25"/>
+    <Cooldown Duration="120" PowerLow="0.65" PowerHigh="0.40" Cadence="85"/>
+  </workout>
+</workout_file>

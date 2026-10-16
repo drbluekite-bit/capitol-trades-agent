@@ -1,0 +1,20 @@
+<workout_file>
+  <author>Velodrome Ghost</author>
+  <name>Kilo Time Trial - 4 laps</name>
+  <description>1 km standing-start time trial. Huge first lap to get up to speed, then hang on. Race it over 4 laps.</description>
+  <sportType>bike</sportType>
+  <tags>
+    <tag name="TRACK"/>
+    <tag name="TT"/>
+  </tags>
+  <workout>
+    <SteadyState Duration="15" Power="2.00" Cadence="100">
+      <textevent timeoffset="0" message="Standing start - drive it!"/>
+    </SteadyState>
+    <SteadyState Duration="40" Power="1.35" Cadence="110"/>
+    <Ramp Duration="25" PowerLow="1.25" PowerHigh="1.05" Cadence="105">
+      <textevent timeoffset="0" message="Hang on!"/>
+    </Ramp>
+    <Cooldown Duration="90" PowerLow="0.60" PowerHigh="0.35" Cadence="85"/>
+  </workout>
+</workout_file>

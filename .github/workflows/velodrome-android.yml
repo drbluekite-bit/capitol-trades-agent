@@ -1,0 +1,59 @@
+name: Velodrome Ghost (Android)
+
+on:
+  push:
+    paths:
+      - "velodrome/**"
+      - ".github/workflows/velodrome-android.yml"
+  pull_request:
+    paths:
+      - "velodrome/**"
+      - ".github/workflows/velodrome-android.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: velodrome
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Unit tests (race engine, .zwo parser, FTMS)
+        run: ./gradlew :core:test --console=plain
+
+      - name: Build APK
+        run: ./gradlew :app:assembleDebug --console=plain
+
+      - name: Rename APK
+        run: cp app/build/outputs/apk/debug/app-debug.apk velodrome-ghost.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: velodrome-ghost-apk
+          path: velodrome/velodrome-ghost.apk
+
+      # Easy phone/tablet download: the latest build is attached to the "velodrome-latest" pre-release.
+      - name: Publish to pre-release
+        if: github.event_name != 'pull_request'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: velodrome-latest
+          name: Velodrome Ghost (latest build)
+          prerelease: true
+          make_latest: false
+          body: |
+            Latest Velodrome Ghost Android build from `${{ github.ref_name }}` (${{ github.sha }}).
+            Download `velodrome-ghost.apk` on your phone and open it to install.
+          files: velodrome/velodrome-ghost.apk

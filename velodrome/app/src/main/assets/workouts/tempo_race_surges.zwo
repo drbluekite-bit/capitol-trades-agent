@@ -1,0 +1,17 @@
+<workout_file>
+  <author>Velodrome Ghost</author>
+  <name>Tempo Race - Surges</name>
+  <description>Scratch / tempo race style pacing: a warm-up, then eight 15-second attacks off a fast tempo. Good over 30-40 laps.</description>
+  <sportType>bike</sportType>
+  <tags>
+    <tag name="TRACK"/>
+  </tags>
+  <workout>
+    <Warmup Duration="120" PowerLow="0.55" PowerHigh="0.85" Cadence="90"/>
+    <IntervalsT Repeat="8" OnDuration="15" OffDuration="45" OnPower="1.30" OffPower="0.85" Cadence="110" CadenceResting="95">
+      <textevent timeoffset="0" message="Attack! Follow the ghost"/>
+    </IntervalsT>
+    <SteadyState Duration="120" Power="0.90" Cadence="98"/>
+    <Cooldown Duration="120" PowerLow="0.65" PowerHigh="0.40" Cadence="85"/>
+  </workout>
+</workout_file>
