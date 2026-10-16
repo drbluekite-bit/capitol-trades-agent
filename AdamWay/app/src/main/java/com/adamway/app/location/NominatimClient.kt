@@ -112,13 +112,15 @@ class NominatimClient {
     }
 
     /** A single best-guess coordinate for [query]. See the fallback-only caveat in the class doc. */
-    suspend fun geocode(query: String): GeocodeResult = try {
-        val first = search(query, limit = 1).firstOrNull()
-            ?: return GeocodeResult.Error("No map match found for \"$query\"")
-        GeocodeResult.Success(LatLng(first.lat.toDouble(), first.lon.toDouble()))
-    } catch (e: IOException) {
-        GeocodeResult.Error(e.message ?: "Network error contacting the geocoding service")
-    } catch (e: Exception) {
-        GeocodeResult.Error(e.message ?: "Couldn't parse the geocoding result")
+    suspend fun geocode(query: String): GeocodeResult {
+        return try {
+            val first = search(query, limit = 1).firstOrNull()
+                ?: return GeocodeResult.Error("No map match found for \"$query\"")
+            GeocodeResult.Success(LatLng(first.lat.toDouble(), first.lon.toDouble()))
+        } catch (e: IOException) {
+            GeocodeResult.Error(e.message ?: "Network error contacting the geocoding service")
+        } catch (e: Exception) {
+            GeocodeResult.Error(e.message ?: "Couldn't parse the geocoding result")
+        }
     }
 }
