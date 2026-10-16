@@ -6,8 +6,6 @@ import com.adamway.app.data.Address
 import com.adamway.app.data.AddressRepository
 import com.adamway.app.data.SavedAddress
 import com.adamway.app.data.SavedAddressRepository
-import com.adamway.app.location.AddressSuggestion
-import com.adamway.app.location.NominatimClient
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -26,7 +24,6 @@ sealed class AddressEvent {
 class AddressViewModel(
     private val repository: AddressRepository,
     private val savedAddressRepository: SavedAddressRepository,
-    private val nominatimClient: NominatimClient = NominatimClient(),
 ) : ViewModel() {
 
     val queue: StateFlow<List<Address>> = repository.observeQueue()
@@ -44,22 +41,9 @@ class AddressViewModel(
         editingAddress.value = address
     }
 
-    /**
-     * [resolvedLat]/[resolvedLng] is a location the user picked themselves
-     * from the address search results — pass it when available so the
-     * stop never needs geocoding again at journey time.
-     */
-    fun addAddress(
-        houseNumber: String,
-        houseName: String,
-        postcode: String,
-        what3words: String,
-        savedAddressId: Long? = null,
-        resolvedLat: Double? = null,
-        resolvedLng: Double? = null,
-    ) {
+    fun addAddress(addressText: String, what3words: String, savedAddressId: Long? = null) {
         viewModelScope.launch {
-            when (repository.addAddress(houseNumber, houseName, postcode, what3words, savedAddressId, resolvedLat, resolvedLng)) {
+            when (repository.addAddress(addressText, what3words, savedAddressId)) {
                 is AddressRepository.AddResult.Success -> _events.send(AddressEvent.Added)
                 is AddressRepository.AddResult.QueueFull -> _events.send(AddressEvent.QueueFull)
                 is AddressRepository.AddResult.BlankAddress -> _events.send(AddressEvent.BlankAddress)
@@ -67,8 +51,8 @@ class AddressViewModel(
         }
     }
 
-    fun updateAddress(address: Address, resolvedLat: Double? = null, resolvedLng: Double? = null) {
-        viewModelScope.launch { repository.updateAddress(address, resolvedLat, resolvedLng) }
+    fun updateAddress(address: Address) {
+        viewModelScope.launch { repository.updateAddress(address) }
     }
 
     fun deleteAddress(address: Address) {
@@ -85,11 +69,4 @@ class AddressViewModel(
 
     /** Previously-used addresses from memory that loosely match [query], for autocomplete. */
     suspend fun suggestAddresses(query: String): List<SavedAddress> = savedAddressRepository.search(query)
-
-    /**
-     * Live candidate addresses matching [query] from the map data itself —
-     * like typing into Google Maps' own search bar — for the user to
-     * confirm the exact one rather than Adam Way guessing.
-     */
-    suspend fun searchMapAddresses(query: String): List<AddressSuggestion> = nominatimClient.suggest(query)
 }

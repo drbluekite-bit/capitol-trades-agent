@@ -1,7 +1,6 @@
 package com.adamway.app.location
 
 import com.adamway.app.data.Address
-import com.adamway.app.data.SavedAddressRepository
 
 sealed class ResolvedStop {
     data class Coordinates(val address: Address, val latLng: LatLng) : ResolvedStop()
@@ -13,38 +12,28 @@ sealed class ResolvedStop {
  * Turns each queued [Address] into something Google Maps can navigate to.
  *
  * Priority order:
- * 1. A location the user explicitly **confirmed** themselves — by picking
- *    an address-search suggestion when adding the stop — stored on its
- *    linked [com.adamway.app.data.SavedAddress]. This is the only source
- *    that's actually certain: nothing is being guessed.
- * 2. A what3words entry, resolved via [What3WordsClient].
- * 3. A postal address, resolved via [NominatimClient] as a best-guess
- *    automatic geocode — used only when the stop was never confirmed
- *    (e.g. added before this existed). This is inherently less reliable
- *    than (1), since nothing double-checks its single guess.
- *
- * Free text is only used as a last-resort fallback if a lookup fails
- * (e.g. no network), so a flaky geocoding call never blocks the stop from
- * being added to the route entirely.
+ * 1. A what3words entry, resolved to coordinates via [What3WordsClient] —
+ *    reliable, since it's a dedicated lookup rather than a guess.
+ * 2. The free-text address line, handed to Maps/Waze exactly as typed so
+ *    *their* geocoder resolves it — the same thing that happens when you
+ *    type an address into Google Maps' own search bar. Adam Way doesn't
+ *    try to geocode postal addresses itself: an earlier version did (first
+ *    naively, then via OpenStreetMap's free Nominatim search), and both
+ *    could still resolve to the wrong place for a short or ambiguous
+ *    address — including once sending a Rotherham address to Mongolia, and
+ *    another time landing on a postcode's centroid rather than the actual
+ *    house. Google's and Waze's own geocoders have far better UK address
+ *    coverage than either of those attempts did.
  */
-class AddressLocationResolver(
-    private val what3WordsClient: What3WordsClient,
-    private val savedAddressRepository: SavedAddressRepository,
-    private val nominatimClient: NominatimClient = NominatimClient(),
-) {
+class AddressLocationResolver(private val what3WordsClient: What3WordsClient) {
 
     suspend fun resolve(address: Address): ResolvedStop {
-        val confirmed = address.savedAddressId?.let { savedAddressRepository.getById(it) }
-        if (confirmed != null && confirmed.hasConfirmedLocation) {
-            return ResolvedStop.Coordinates(address, LatLng(confirmed.resolvedLat!!, confirmed.resolvedLng!!))
-        }
-
         if (address.what3words.isNotBlank()) {
             val w3wResult = what3WordsClient.convertToCoordinates(address.what3words)
             if (w3wResult is What3WordsResult.Success) {
                 return ResolvedStop.Coordinates(address, w3wResult.location)
             }
-            if (address.postalQuery.isBlank()) {
+            if (address.addressText.isBlank()) {
                 val reason = when (w3wResult) {
                     is What3WordsResult.MissingApiKey -> "Add a what3words API key in Settings to use ///${address.what3words}"
                     is What3WordsResult.Error -> w3wResult.message
@@ -52,17 +41,11 @@ class AddressLocationResolver(
                 }
                 return ResolvedStop.Unresolved(address, reason)
             }
-            // No usable what3words result, but there are postal fields too — fall through and try those.
+            // No usable what3words result, but there's an address line too — fall through and use that.
         }
 
-        if (address.postalQuery.isNotBlank()) {
-            val geocoded = nominatimClient.geocode(address.postalQuery)
-            return if (geocoded is GeocodeResult.Success) {
-                ResolvedStop.Coordinates(address, geocoded.location)
-            } else {
-                // Couldn't pin it down ourselves — let Maps try its own free-text geocoding as a fallback.
-                ResolvedStop.TextQuery(address, address.postalQuery)
-            }
+        if (address.addressText.isNotBlank()) {
+            return ResolvedStop.TextQuery(address, address.addressText)
         }
 
         return ResolvedStop.Unresolved(address, "No usable address details")

@@ -18,20 +18,16 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.PhotoCamera
-import androidx.compose.material.icons.filled.Place
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -48,18 +44,14 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.adamway.app.data.SavedAddress
-import com.adamway.app.location.AddressSuggestion
-import com.adamway.app.ocr.AddressParser
 import com.adamway.app.viewmodel.AddressEvent
 import com.adamway.app.viewmodel.AddressViewModel
-import kotlinx.coroutines.delay
 
 @Composable
 fun AddEditAddressScreen(
@@ -69,76 +61,26 @@ fun AddEditAddressScreen(
     val editing by addressViewModel.editingAddress.collectAsState()
     val context = LocalContext.current
 
-    var houseNumber by rememberSaveable(editing) { mutableStateOf(editing?.houseNumber ?: "") }
-    var houseName by rememberSaveable(editing) { mutableStateOf(editing?.houseName ?: "") }
-    var postcode by rememberSaveable(editing) { mutableStateOf(editing?.postcode ?: "") }
+    var addressText by rememberSaveable(editing) { mutableStateOf(editing?.addressText ?: "") }
     var what3words by rememberSaveable(editing) { mutableStateOf(editing?.what3words ?: "") }
     var selectedSavedAddressId by remember(editing) { mutableStateOf<Long?>(null) }
     var suggestions by remember { mutableStateOf<List<SavedAddress>>(emptyList()) }
 
-    // Set once the user taps a result from the live address search below —
-    // this is what actually gets sent to Maps at journey time, instead of
-    // Adam Way geocoding the typed fields itself and hoping it guessed
-    // right.
-    var confirmedLat by remember(editing) { mutableStateOf<Double?>(null) }
-    var confirmedLng by remember(editing) { mutableStateOf<Double?>(null) }
-    var mapSuggestions by remember { mutableStateOf<List<AddressSuggestion>>(emptyList()) }
-    var isSearchingMap by remember { mutableStateOf(false) }
-
     var showCamera by remember { mutableStateOf(false) }
 
-    fun clearConfirmedPick() {
-        selectedSavedAddressId = null
-        confirmedLat = null
-        confirmedLng = null
-    }
-
     fun applySuggestion(suggestion: SavedAddress) {
-        houseNumber = suggestion.houseNumber
-        houseName = suggestion.houseName
-        postcode = suggestion.postcode
+        addressText = suggestion.addressText
         what3words = suggestion.what3words
         selectedSavedAddressId = suggestion.id
-        confirmedLat = suggestion.resolvedLat
-        confirmedLng = suggestion.resolvedLng
-        suggestions = emptyList()
-        mapSuggestions = emptyList()
-    }
-
-    fun applyMapSuggestion(suggestion: AddressSuggestion) {
-        if (suggestion.houseNumber.isNotBlank()) houseNumber = suggestion.houseNumber
-        if (suggestion.road.isNotBlank()) houseName = suggestion.road
-        if (suggestion.postcode.isNotBlank()) postcode = suggestion.postcode
-        selectedSavedAddressId = null
-        confirmedLat = suggestion.location.lat
-        confirmedLng = suggestion.location.lng
-        mapSuggestions = emptyList()
         suggestions = emptyList()
     }
 
-    val suggestionQuery = listOf(houseNumber, houseName, postcode, what3words).filter { it.isNotBlank() }.joinToString(" ")
+    val suggestionQuery = listOf(addressText, what3words).filter { it.isNotBlank() }.joinToString(" ")
     LaunchedEffect(suggestionQuery, editing) {
         suggestions = if (editing == null && selectedSavedAddressId == null && suggestionQuery.isNotBlank()) {
             addressViewModel.suggestAddresses(suggestionQuery)
         } else {
             emptyList()
-        }
-    }
-
-    // A live, Google-Maps-search-style lookup: as you type a number and
-    // street, this shows real candidate addresses to pick the exact one
-    // from — debounced so it only fires once you pause typing, and only
-    // once there's enough to search on.
-    val mapQuery = listOf(houseNumber, houseName, postcode).filter { it.isNotBlank() }.joinToString(" ")
-    LaunchedEffect(mapQuery) {
-        if (confirmedLat != null || mapQuery.trim().length < 5) {
-            mapSuggestions = emptyList()
-            isSearchingMap = false
-        } else {
-            isSearchingMap = true
-            delay(600)
-            mapSuggestions = addressViewModel.searchMapAddresses(mapQuery)
-            isSearchingMap = false
         }
     }
 
@@ -160,16 +102,8 @@ fun AddEditAddressScreen(
             Toast.makeText(context, "Didn't catch that — try again", Toast.LENGTH_SHORT).show()
             return@rememberLauncherForActivityResult
         }
-        val parsed = AddressParser.parse(spoken)
-        if (parsed.houseNumber.isNotBlank()) houseNumber = parsed.houseNumber
-        if (parsed.houseName.isNotBlank()) houseName = parsed.houseName
-        if (parsed.postcode.isNotBlank()) postcode = parsed.postcode
-        if (parsed.houseNumber.isBlank() && parsed.houseName.isBlank() && parsed.postcode.isBlank()) {
-            // Couldn't pick out a number/postcode — drop the raw transcript into house name
-            // rather than lose it, so the user can still see and edit what was heard.
-            houseName = spoken
-        }
-        clearConfirmedPick()
+        addressText = spoken
+        selectedSavedAddressId = null
     }
 
     fun launchVoiceInput() {
@@ -195,7 +129,7 @@ fun AddEditAddressScreen(
                 ).show()
                 AddressEvent.BlankAddress -> Toast.makeText(
                     context,
-                    "Enter at least one field before saving",
+                    "Enter an address before saving",
                     Toast.LENGTH_LONG,
                 ).show()
             }
@@ -205,10 +139,10 @@ fun AddEditAddressScreen(
     if (showCamera) {
         CameraCaptureScreen(
             onTextRecognized = { parsed ->
-                if (parsed.houseNumber.isNotBlank()) houseNumber = parsed.houseNumber
-                if (parsed.houseName.isNotBlank()) houseName = parsed.houseName
-                if (parsed.postcode.isNotBlank()) postcode = parsed.postcode
-                clearConfirmedPick()
+                if (parsed.isNotBlank()) {
+                    addressText = parsed
+                    selectedSavedAddressId = null
+                }
                 showCamera = false
             },
             onCancel = { showCamera = false },
@@ -241,7 +175,7 @@ fun AddEditAddressScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Text(
-                "Fill in whichever details you have — none of these fields are required on their own, but at least one is needed.",
+                "Type the address exactly as you would into Google Maps' search bar — Maps or Waze will resolve it themselves when you start the journey. A what3words address is optional, as an alternative or extra.",
                 color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
             )
 
@@ -264,87 +198,20 @@ fun AddEditAddressScreen(
             }
 
             OutlinedTextField(
-                value = houseNumber,
-                onValueChange = { houseNumber = it; clearConfirmedPick() },
-                label = { Text("House number") },
+                value = addressText,
+                onValueChange = { addressText = it; selectedSavedAddressId = null },
+                label = { Text("Address") },
+                placeholder = { Text("e.g. 24 Sandybrook Close, Bury BL8 3LB") },
                 modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-            )
-            OutlinedTextField(
-                value = houseName,
-                onValueChange = { houseName = it; clearConfirmedPick() },
-                label = { Text("House name / street") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-            )
-            OutlinedTextField(
-                value = postcode,
-                onValueChange = { postcode = it; clearConfirmedPick() },
-                label = { Text("Postcode") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
             )
             OutlinedTextField(
                 value = what3words,
-                onValueChange = { what3words = it; clearConfirmedPick() },
-                label = { Text("what3words (e.g. filled.count.soap)") },
+                onValueChange = { what3words = it; selectedSavedAddressId = null },
+                label = { Text("what3words (optional)") },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 prefix = { Text("///") },
             )
-
-            if (confirmedLat != null) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Filled.CheckCircle, contentDescription = null, tint = MaterialTheme.colorScheme.secondary)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        "Exact location confirmed from the map",
-                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
-                    )
-                }
-            }
-
-            if (isSearchingMap) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Searching the map…", color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f))
-                }
-            }
-
-            if (mapSuggestions.isNotEmpty()) {
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(
-                        "Matching addresses — tap the exact one:",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
-                    )
-                    mapSuggestions.forEach { suggestion ->
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(MaterialTheme.colorScheme.surface)
-                                .clickable { applyMapSuggestion(suggestion) }
-                                .padding(12.dp),
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    Icons.Filled.Place,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    suggestion.displayName,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                    style = MaterialTheme.typography.bodyLarge,
-                                )
-                            }
-                        }
-                    }
-                }
-            }
 
             if (suggestions.isNotEmpty()) {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -362,7 +229,7 @@ fun AddEditAddressScreen(
                                 .clickable { applySuggestion(suggestion) }
                                 .padding(12.dp),
                         ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
+                            Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                                 Icon(
                                     Icons.Filled.History,
                                     contentDescription = null,
@@ -380,20 +247,13 @@ fun AddEditAddressScreen(
                 onClick = {
                     val current = editing
                     if (current == null) {
-                        addressViewModel.addAddress(
-                            houseNumber, houseName, postcode, what3words,
-                            selectedSavedAddressId, confirmedLat, confirmedLng,
-                        )
+                        addressViewModel.addAddress(addressText, what3words, selectedSavedAddressId)
                     } else {
                         addressViewModel.updateAddress(
                             current.copy(
-                                houseNumber = houseNumber.trim(),
-                                houseName = houseName.trim(),
-                                postcode = postcode.trim(),
+                                addressText = addressText.trim(),
                                 what3words = what3words.trim().removePrefix("///"),
                             ),
-                            confirmedLat,
-                            confirmedLng,
                         )
                         onDone()
                     }

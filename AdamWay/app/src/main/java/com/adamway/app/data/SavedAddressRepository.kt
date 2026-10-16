@@ -15,7 +15,7 @@ class SavedAddressRepository(private val dao: SavedAddressDao) {
         if (needle.isBlank()) return emptyList()
         return dao.getAll()
             .filter { candidate ->
-                listOf(candidate.houseNumber, candidate.houseName, candidate.postcode, candidate.what3words)
+                listOf(candidate.addressText, candidate.what3words)
                     .any { it.isNotBlank() && it.lowercase().contains(needle) }
             }
             .sortedByDescending { it.lastUsedAt }
@@ -25,71 +25,22 @@ class SavedAddressRepository(private val dao: SavedAddressDao) {
     /**
      * Finds the saved address matching these details, refreshing its
      * "last used" time, or creates a new one if this is the first time
-     * this address has been added. [resolvedLat]/[resolvedLng], when
-     * given, is a location the user just picked themselves from the
-     * address search suggestions — a fresh confirmed pick always replaces
-     * whatever was stored before (even on an existing match), since it's
-     * more trustworthy than anything guessed automatically; passing null
-     * for both (a plain manual edit with no new pick) leaves it as is.
+     * this address has been added.
      */
-    suspend fun findOrCreate(
-        houseNumber: String,
-        houseName: String,
-        postcode: String,
-        what3words: String,
-        resolvedLat: Double? = null,
-        resolvedLng: Double? = null,
-    ): Long {
-        val match = dao.getAll().firstOrNull { it.matches(houseNumber, houseName, postcode, what3words) }
+    suspend fun findOrCreate(addressText: String, what3words: String): Long {
+        val match = dao.getAll().firstOrNull { it.matches(addressText, what3words) }
         return if (match != null) {
-            dao.upsert(
-                match.copy(
-                    lastUsedAt = System.currentTimeMillis(),
-                    resolvedLat = resolvedLat ?: match.resolvedLat,
-                    resolvedLng = resolvedLng ?: match.resolvedLng,
-                )
-            )
+            dao.upsert(match.copy(lastUsedAt = System.currentTimeMillis()))
             match.id
         } else {
-            dao.upsert(
-                SavedAddress(
-                    houseNumber = houseNumber.trim(),
-                    houseName = houseName.trim(),
-                    postcode = postcode.trim(),
-                    what3words = what3words.trim(),
-                    resolvedLat = resolvedLat,
-                    resolvedLng = resolvedLng,
-                )
-            )
+            dao.upsert(SavedAddress(addressText = addressText.trim(), what3words = what3words.trim()))
         }
     }
 
-    /**
-     * Keeps the address book's core fields in sync when a queued address is
-     * edited. A fresh [resolvedLat]/[resolvedLng] (the user re-confirmed the
-     * address from search results) replaces any previous one; passing null
-     * for both leaves whatever location was already stored untouched.
-     */
-    suspend fun syncCoreFields(
-        id: Long,
-        houseNumber: String,
-        houseName: String,
-        postcode: String,
-        what3words: String,
-        resolvedLat: Double? = null,
-        resolvedLng: Double? = null,
-    ) {
+    /** Keeps the address book's core fields in sync when a queued address is edited. */
+    suspend fun syncCoreFields(id: Long, addressText: String, what3words: String) {
         val existing = dao.getById(id) ?: return
-        dao.upsert(
-            existing.copy(
-                houseNumber = houseNumber.trim(),
-                houseName = houseName.trim(),
-                postcode = postcode.trim(),
-                what3words = what3words.trim(),
-                resolvedLat = resolvedLat ?: existing.resolvedLat,
-                resolvedLng = resolvedLng ?: existing.resolvedLng,
-            )
-        )
+        dao.upsert(existing.copy(addressText = addressText.trim(), what3words = what3words.trim()))
     }
 
     suspend fun updateNotes(id: Long, notes: String, photoPaths: List<String>) {

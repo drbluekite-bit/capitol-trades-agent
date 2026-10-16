@@ -6,17 +6,13 @@ picker tops out at around 10. Black background, white "AW" logo.
 
 ## What it does
 
-1. **Add addresses** to a queue (up to 18), manually, by photographing one
-   (house number/name, postcode, plaque, etc.) and letting on-device text
-   recognition pre-fill the form, or by tapping **Speak address** and
-   saying it out loud. Every field — house number, house name, postcode,
-   what3words — is optional on its own; you just need at least one filled
-   in per address. The Queue screen and the home screen both have a
-   **Clear queue** action for starting over.
-   As you type a number and street, **matching addresses** show up below
-   the form — the same way typing into Google Maps' own search bar brings
-   up a results list — so you pick the exact one yourself instead of Adam
-   Way silently geocoding and hoping it guessed right.
+1. **Add addresses** to a queue (up to 18) by typing one address into a
+   single field, exactly as you would into Google Maps' own search bar
+   (e.g. "24 Sandybrook Close, Bury BL8 3LB"). You can also photograph an
+   envelope, door plaque, etc. and let on-device text recognition fill in
+   that field, or tap **Speak address** and say it out loud. A what3words
+   address is optional, as an alternative or extra. The Queue screen and
+   the home screen both have a **Clear queue** action for starting over.
 2. **Begin Journey** sends the first 5 addresses to Google Maps as a single
    multi-stop route.
 3. Each time you tap **Arrived – Next Stop** in Adam Way (after leaving
@@ -53,25 +49,24 @@ or background service.
 - **No Google Maps/Directions API key, ever.** Routes are opened with a
   plain `https://www.google.com/maps/dir/?api=1&...` deep link (an Intent),
   which is free and doesn't require any API key or billing account.
-- **You confirm the exact address yourself — Adam Way doesn't silently
-  geocode and guess.** This app went through a few iterations that all
-  tried to resolve a typed address to coordinates automatically (first
-  handing Maps free text and letting it geocode; then geocoding with
-  OpenStreetMap's free Nominatim search API instead). Both can still get
-  it wrong for a short or ambiguous query — one sent a Rotherham address
-  to a street in Mongolia. So the Add/Edit screen now surfaces Nominatim's
-  results as a **pick list** instead of auto-selecting the top match:
-  type a number and street, see real candidate addresses, tap the correct
-  one. That confirmed coordinate is stored against the address and reused
-  at journey time — no further geocoding, no further guessing. Addresses
-  added without using the search (plain manual entry, or ones added
-  before this existed) still fall back to an automatic best-guess geocode
-  at journey time, restricted to Great Britain since this app's address
-  parsing already assumes UK postcodes — but confirming via search is the
-  reliable path.
+- **Adam Way never geocodes a postal address itself — Maps or Waze does,
+  exactly as if you'd typed it into their own search bar.** This went
+  through a few iterations that all tried to resolve a typed address to
+  coordinates inside the app first: first handing Maps free text framed
+  from separate house-number/street/postcode fields (which could mis-join
+  into the wrong query), then geocoding with OpenStreetMap's free
+  Nominatim search API (which once sent a Rotherham address to a street in
+  Mongolia, and another time "confirmed" a pick-list result that was
+  actually just a postcode's centroid rather than the real house — Nominatim's
+  free UK data often isn't mapped at house-level). All of that is gone now.
+  Address entry is a single free-text field; whatever you type, speak, or
+  scan goes straight into it, and that exact text is handed to Google Maps
+  or Waze as a destination/waypoint when you start the journey — their own
+  geocoders (which have full, commercial-grade UK address coverage) resolve
+  it, the same as if you'd typed it directly into either app.
 - **what3words is optional and needs your own free API key.** A
-  `///three.word.address` means nothing to Google Maps or to Nominatim —
-  so if you want a what3words-only stop included in the *same* multi-stop
+  `///three.word.address` means nothing to Google Maps's geocoder — so if
+  you want a what3words-only stop included in the *same* multi-stop
   Maps route as your other addresses, Adam Way converts it to a
   latitude/longitude first via the what3words API (`api.what3words.com`),
   which requires a free personal API key from
@@ -109,19 +104,14 @@ or background service.
   service) is up to your phone/Google Assistant settings, not this app.
 - The what3words API key is stored in an Android Keystore-backed
   `EncryptedSharedPreferences` file.
-- The only network calls the app ever makes: (1) searching/geocoding an
-  address via `nominatim.openstreetmap.org` (OpenStreetMap's free
-  service — see their
-  [privacy policy](https://osmfoundation.org/wiki/Privacy_Policy) for how
-  they handle requests), sent as you type in the Add/Edit screen (so you
-  can pick the right address) and, for unconfirmed addresses only, again
-  at journey time, (2)
-  the optional `api.what3words.com` coordinate lookup, sent only when a
-  queued address has a what3words value and only with your own key, and
-  (3) handing a route off to Google Maps, Waze, or What3Words via an
-  Android Intent when you tap a navigation button — at that point your
-  route data goes directly from the OS to that app, not through any
-  server of ours.
+- The only network calls the app ever makes: (1) the optional
+  `api.what3words.com` coordinate lookup, sent only when a queued address
+  has a what3words value and only with your own key, and (2) handing a
+  route off to Google Maps, Waze, or What3Words via an Android Intent when
+  you tap a navigation button — at that point your route data goes
+  directly from the OS to that app (and from there, to its own geocoder),
+  not through any server of ours. Adam Way itself never geocodes a postal
+  address, so it never sends one anywhere on its own.
 - No analytics, ads, crash reporting, or other third-party SDKs.
 
 ## Building it
@@ -148,8 +138,8 @@ old copy once, then every build from here on updates normally.
 - **Min/target SDK:** 26 / 34
 - **Persistence:** Room (local only)
 - **Camera/OCR:** CameraX + ML Kit Text Recognition (bundled/on-device model)
-- **Networking:** OkHttp + kotlinx.serialization — geocoding postal
-  addresses (OpenStreetMap Nominatim) and the optional what3words lookup
+- **Networking:** OkHttp + kotlinx.serialization — only for the optional
+  what3words lookup; postal addresses are never geocoded by the app itself
 
 ```
 AdamWay/

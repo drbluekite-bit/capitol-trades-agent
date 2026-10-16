@@ -53,7 +53,7 @@ import java.util.concurrent.Executors
  */
 @Composable
 fun CameraCaptureScreen(
-    onTextRecognized: (AddressParser.ParsedAddress) -> Unit,
+    onTextRecognized: (String) -> Unit,
     onCancel: () -> Unit,
 ) {
     val context = LocalContext.current

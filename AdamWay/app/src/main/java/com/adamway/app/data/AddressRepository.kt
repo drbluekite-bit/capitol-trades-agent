@@ -24,23 +24,15 @@ class AddressRepository(
      * [savedAddressId] links this queue entry to an existing address-book
      * entry — pass it when the user picked a suggested previous address, so
      * its notes/photos carry over instead of a new, duplicate memory entry
-     * being created. [resolvedLat]/[resolvedLng] is a location the user
-     * confirmed themselves from the address search results; passed through
-     * to the new address-book entry so it never needs geocoding again.
+     * being created.
      */
     suspend fun addAddress(
-        houseNumber: String,
-        houseName: String,
-        postcode: String,
+        addressText: String,
         what3words: String,
         savedAddressId: Long? = null,
-        resolvedLat: Double? = null,
-        resolvedLng: Double? = null,
     ): AddResult {
         val candidate = Address(
-            houseNumber = houseNumber.trim(),
-            houseName = houseName.trim(),
-            postcode = postcode.trim(),
+            addressText = addressText.trim(),
             what3words = normalizeWhat3Words(what3words),
             position = 0,
         )
@@ -50,31 +42,16 @@ class AddressRepository(
         if (existing.size >= MAX_QUEUE_SIZE) return AddResult.QueueFull
 
         val resolvedSavedAddressId = savedAddressId
-            ?: savedAddressRepository.findOrCreate(
-                candidate.houseNumber,
-                candidate.houseName,
-                candidate.postcode,
-                candidate.what3words,
-                resolvedLat,
-                resolvedLng,
-            )
+            ?: savedAddressRepository.findOrCreate(candidate.addressText, candidate.what3words)
         val id = dao.insert(candidate.copy(position = existing.size, savedAddressId = resolvedSavedAddressId))
         return AddResult.Success(id)
     }
 
-    suspend fun updateAddress(address: Address, resolvedLat: Double? = null, resolvedLng: Double? = null) {
+    suspend fun updateAddress(address: Address) {
         val normalized = address.copy(what3words = normalizeWhat3Words(address.what3words))
         dao.update(normalized)
         normalized.savedAddressId?.let {
-            savedAddressRepository.syncCoreFields(
-                it,
-                normalized.houseNumber,
-                normalized.houseName,
-                normalized.postcode,
-                normalized.what3words,
-                resolvedLat,
-                resolvedLng,
-            )
+            savedAddressRepository.syncCoreFields(it, normalized.addressText, normalized.what3words)
         }
     }
 

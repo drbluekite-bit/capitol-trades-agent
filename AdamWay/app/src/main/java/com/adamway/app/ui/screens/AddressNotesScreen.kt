@@ -108,7 +108,7 @@ fun AddressNotesScreen(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            address?.postcode?.takeIf { it.isNotBlank() }?.let {
+            address?.addressText?.takeIf { it.isNotBlank() }?.let {
                 Text(it, color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f))
             }
 
