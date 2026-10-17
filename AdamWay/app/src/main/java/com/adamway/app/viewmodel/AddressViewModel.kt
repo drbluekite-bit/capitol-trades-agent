@@ -6,6 +6,7 @@ import com.adamway.app.data.Address
 import com.adamway.app.data.AddressRepository
 import com.adamway.app.data.SavedAddress
 import com.adamway.app.data.SavedAddressRepository
+import com.adamway.app.location.NominatimClient
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -24,6 +25,7 @@ sealed class AddressEvent {
 class AddressViewModel(
     private val repository: AddressRepository,
     private val savedAddressRepository: SavedAddressRepository,
+    private val nominatimClient: NominatimClient = NominatimClient(),
 ) : ViewModel() {
 
     val queue: StateFlow<List<Address>> = repository.observeQueue()
@@ -51,6 +53,17 @@ class AddressViewModel(
         }
     }
 
+    /**
+     * One-tap add for a favorite/quick-add location. Deliberately doesn't
+     * go through [events] — that channel is only meant for the Add/Edit
+     * screen to react to (e.g. close itself on success), and a stale
+     * unread event sent while that screen isn't even open would otherwise
+     * sit buffered and fire against it later, the next time it opens.
+     */
+    fun quickAdd(addressText: String) {
+        viewModelScope.launch { repository.addAddress(addressText, what3words = "") }
+    }
+
     fun updateAddress(address: Address) {
         viewModelScope.launch { repository.updateAddress(address) }
     }
@@ -69,4 +82,11 @@ class AddressViewModel(
 
     /** Previously-used addresses from memory that loosely match [query], for autocomplete. */
     suspend fun suggestAddresses(query: String): List<SavedAddress> = savedAddressRepository.search(query)
+
+    /**
+     * Live candidate address lines matching [query] — like typing into
+     * Google Maps' own search bar. Text only, never a coordinate: see
+     * [NominatimClient]'s class doc for why.
+     */
+    suspend fun searchAddressSuggestions(query: String): List<String> = nominatimClient.suggest(query)
 }

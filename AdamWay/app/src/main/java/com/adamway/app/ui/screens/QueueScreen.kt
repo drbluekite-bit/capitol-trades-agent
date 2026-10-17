@@ -1,14 +1,18 @@
 package com.adamway.app.ui.screens
 
+import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.DeleteSweep
+import androidx.compose.material.icons.filled.Store
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -24,11 +28,19 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.adamway.app.data.AddressRepository
 import com.adamway.app.ui.components.AddressCard
 import com.adamway.app.ui.components.ConfirmDialog
 import com.adamway.app.viewmodel.AddressViewModel
+
+/** A one-tap favorite destination, so a regular stop never needs retyping. */
+private data class QuickAddLocation(val label: String, val addressText: String)
+
+private val QUICK_ADD_LOCATIONS = listOf(
+    QuickAddLocation("Tesco Extra, Barnsley", "Tesco Extra, Wombwell Lane, Barnsley S70 3NS"),
+)
 
 @Composable
 fun QueueScreen(
@@ -38,6 +50,7 @@ fun QueueScreen(
     onEditAddress: () -> Unit,
     onOpenNotes: (Long) -> Unit,
 ) {
+    val context = LocalContext.current
     val queue by addressViewModel.queue.collectAsState()
     var showClearConfirm by remember { mutableStateOf(false) }
 
@@ -85,6 +98,18 @@ fun QueueScreen(
             }
         },
     ) { padding ->
+        fun quickAdd(location: QuickAddLocation) {
+            if (queue.size >= AddressRepository.MAX_QUEUE_SIZE) {
+                Toast.makeText(
+                    context,
+                    "Queue is full (${AddressRepository.MAX_QUEUE_SIZE} max) — remove a stop first",
+                    Toast.LENGTH_LONG,
+                ).show()
+            } else {
+                addressViewModel.quickAdd(location.addressText)
+            }
+        }
+
         if (queue.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
                 Text(
@@ -94,27 +119,42 @@ fun QueueScreen(
                 )
             }
         } else {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = 8.dp),
-            ) {
-                items(queue.size) { index ->
-                    val address = queue[index]
-                    AddressCard(
-                        index = index,
-                        address = address,
-                        canMoveUp = index > 0,
-                        canMoveDown = index < queue.size - 1,
-                        onClick = {
-                            addressViewModel.startEditing(address)
-                            onEditAddress()
-                        },
-                        onInfo = { address.savedAddressId?.let(onOpenNotes) },
-                        onMoveUp = { addressViewModel.reorder(index, index - 1) },
-                        onMoveDown = { addressViewModel.reorder(index, index + 1) },
-                        onDelete = { addressViewModel.deleteAddress(address) },
-                    )
+            androidx.compose.foundation.layout.Column(modifier = Modifier.fillMaxSize().padding(padding)) {
+                androidx.compose.foundation.lazy.LazyRow(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    items(QUICK_ADD_LOCATIONS.size) { i ->
+                        val location = QUICK_ADD_LOCATIONS[i]
+                        AssistChip(
+                            onClick = { quickAdd(location) },
+                            label = { Text(location.label) },
+                            leadingIcon = { Icon(Icons.Filled.Store, contentDescription = null) },
+                        )
+                    }
+                }
+                LazyColumn(
+                    modifier = Modifier.fillMaxWidth().weight(1f).padding(horizontal = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = 8.dp),
+                ) {
+                    items(queue.size) { index ->
+                        val address = queue[index]
+                        AddressCard(
+                            index = index,
+                            address = address,
+                            canMoveUp = index > 0,
+                            canMoveDown = index < queue.size - 1,
+                            onClick = {
+                                addressViewModel.startEditing(address)
+                                onEditAddress()
+                            },
+                            onInfo = { address.savedAddressId?.let(onOpenNotes) },
+                            onMoveUp = { addressViewModel.reorder(index, index - 1) },
+                            onMoveDown = { addressViewModel.reorder(index, index + 1) },
+                            onDelete = { addressViewModel.deleteAddress(address) },
+                        )
+                    }
                 }
             }
         }

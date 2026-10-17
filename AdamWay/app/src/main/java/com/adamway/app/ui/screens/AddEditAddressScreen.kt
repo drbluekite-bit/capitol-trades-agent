@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -27,7 +28,9 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material.icons.filled.Place
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -52,6 +55,7 @@ import androidx.core.content.ContextCompat
 import com.adamway.app.data.SavedAddress
 import com.adamway.app.viewmodel.AddressEvent
 import com.adamway.app.viewmodel.AddressViewModel
+import kotlinx.coroutines.delay
 
 @Composable
 fun AddEditAddressScreen(
@@ -66,6 +70,14 @@ fun AddEditAddressScreen(
     var selectedSavedAddressId by remember(editing) { mutableStateOf<Long?>(null) }
     var suggestions by remember { mutableStateOf<List<SavedAddress>>(emptyList()) }
 
+    // A live, Google-Maps-search-style dropdown of candidate address lines
+    // as you type — text only (see NominatimClient's doc): picking one just
+    // fills the field with a complete, correctly-formatted line (postcode
+    // included), it never sets a coordinate Adam Way would trust itself.
+    var mapSuggestions by remember { mutableStateOf<List<String>>(emptyList()) }
+    var isSearchingAddress by remember { mutableStateOf(false) }
+    var suppressMapSuggestions by remember(editing) { mutableStateOf(false) }
+
     var showCamera by remember { mutableStateOf(false) }
 
     fun applySuggestion(suggestion: SavedAddress) {
@@ -73,6 +85,16 @@ fun AddEditAddressScreen(
         what3words = suggestion.what3words
         selectedSavedAddressId = suggestion.id
         suggestions = emptyList()
+        mapSuggestions = emptyList()
+        suppressMapSuggestions = true
+    }
+
+    fun applyMapSuggestion(suggestion: String) {
+        addressText = suggestion
+        selectedSavedAddressId = null
+        suggestions = emptyList()
+        mapSuggestions = emptyList()
+        suppressMapSuggestions = true
     }
 
     val suggestionQuery = listOf(addressText, what3words).filter { it.isNotBlank() }.joinToString(" ")
@@ -81,6 +103,18 @@ fun AddEditAddressScreen(
             addressViewModel.suggestAddresses(suggestionQuery)
         } else {
             emptyList()
+        }
+    }
+
+    LaunchedEffect(addressText, suppressMapSuggestions) {
+        if (suppressMapSuggestions || addressText.trim().length < 5) {
+            mapSuggestions = emptyList()
+            isSearchingAddress = false
+        } else {
+            isSearchingAddress = true
+            delay(600)
+            mapSuggestions = addressViewModel.searchAddressSuggestions(addressText)
+            isSearchingAddress = false
         }
     }
 
@@ -199,7 +233,7 @@ fun AddEditAddressScreen(
 
             OutlinedTextField(
                 value = addressText,
-                onValueChange = { addressText = it; selectedSavedAddressId = null },
+                onValueChange = { addressText = it; selectedSavedAddressId = null; suppressMapSuggestions = false },
                 label = { Text("Address") },
                 placeholder = { Text("e.g. 24 Sandybrook Close, Bury BL8 3LB") },
                 modifier = Modifier.fillMaxWidth(),
@@ -212,6 +246,44 @@ fun AddEditAddressScreen(
                 singleLine = true,
                 prefix = { Text("///") },
             )
+
+            if (isSearchingAddress) {
+                Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Searching…", color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f))
+                }
+            }
+
+            if (mapSuggestions.isNotEmpty()) {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        "Matching addresses — tap the exact one:",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
+                    )
+                    mapSuggestions.forEach { suggestion ->
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(MaterialTheme.colorScheme.surface)
+                                .clickable { applyMapSuggestion(suggestion) }
+                                .padding(12.dp),
+                        ) {
+                            Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                                Icon(
+                                    Icons.Filled.Place,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(suggestion, color = MaterialTheme.colorScheme.onSurface)
+                            }
+                        }
+                    }
+                }
+            }
 
             if (suggestions.isNotEmpty()) {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
