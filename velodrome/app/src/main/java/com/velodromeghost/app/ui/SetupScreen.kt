@@ -94,6 +94,13 @@ fun SetupScreen(vm: RaceViewModel) {
             GhostCard(vm, s)
             RiderCard(vm, s)
             ResistanceCard(vm, s)
+            Section("6 · After the race") {
+                SwitchRow(
+                    "Send ride to ChatGPT automatically",
+                    "When a race finishes, open the ChatGPT app with your ride summary and per-second data attached - just press send",
+                    s.autoSendToChatGpt,
+                ) { on -> vm.update { it.copy(autoSendToChatGpt = on) } }
+            }
             Button(
                 onClick = { vm.startRace() },
                 modifier = Modifier.fillMaxWidth().height(64.dp),

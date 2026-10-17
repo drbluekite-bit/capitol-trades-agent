@@ -89,3 +89,16 @@ class FitTest {
     private fun assertEquals(expected: Long, actual: Double, delta: Double) =
         assertEquals(expected.toDouble(), actual, delta)
 }
+
+class RideCsvTest {
+    @Test
+    fun writesCsv() {
+        val rec = RideRecorder()
+        rec.update(0.0, 200.0, 90.0, null, 10.0, 0.0)
+        rec.update(1.0, 210.0, null, 150, 10.5, 10.25)
+        val lines = com.velodromeghost.core.fit.RideCsv.write(rec.samples).trim().lines()
+        assertEquals(com.velodromeghost.core.fit.RideCsv.HEADER, lines[0])
+        assertEquals("0,200,90,,36.0,0.0", lines[1])
+        assertEquals("1,210,,150,37.8,10.3", lines[2])
+    }
+}

@@ -1,5 +1,6 @@
 package com.velodromeghost.app.ui
 
+import android.content.ClipData
 import android.content.Intent
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -54,6 +55,52 @@ fun ResultsScreen(vm: RaceViewModel) {
         message?.let {
             Toast.makeText(context, it, Toast.LENGTH_LONG).show()
             vm.consumeMessage()
+        }
+    }
+
+    val autoSend by vm.autoSendPending.collectAsStateWithLifecycle()
+
+    fun sendToChatGpt() {
+        scope.launch {
+            val p = vm.chatGptPayload() ?: return@launch
+            val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", p.csv)
+            val withFile = Intent(Intent.ACTION_SEND).apply {
+                type = "text/csv"
+                putExtra(Intent.EXTRA_TEXT, p.text)
+                putExtra(Intent.EXTRA_STREAM, uri)
+                clipData = ClipData.newRawUri(p.csv.name, uri)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            // If ChatGPT won't take a file, paste the data into the message instead.
+            val csv = p.csvText.lines().let { rows ->
+                if (p.csvText.length <= MAX_INLINE_CSV) p.csvText
+                else (listOf(rows.first()) + rows.drop(1).filterIndexed { i, _ -> i % 5 == 0 }).joinToString("\n")
+            }
+            val textOnly = Intent(Intent.ACTION_SEND).apply {
+                type = "text/plain"
+                putExtra(Intent.EXTRA_TEXT, p.text.replace("in the attached CSV", "below") + "\n\n" + csv)
+            }
+            val pm = context.packageManager
+            val target = listOf(withFile, textOnly)
+                .map { Intent(it).setPackage(CHATGPT_PACKAGE) }
+                .firstOrNull { pm.queryIntentActivities(it, 0).isNotEmpty() }
+            try {
+                if (target != null) {
+                    context.startActivity(target)
+                } else {
+                    Toast.makeText(context, "ChatGPT app not found - pick an app to send to", Toast.LENGTH_LONG).show()
+                    context.startActivity(Intent.createChooser(withFile, "Send ride to"))
+                }
+            } catch (e: Exception) {
+                Toast.makeText(context, "Couldn't open ChatGPT: ${e.message}", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    LaunchedEffect(autoSend) {
+        if (autoSend) {
+            vm.consumeAutoSend()
+            sendToChatGpt()
         }
     }
 
@@ -124,6 +171,9 @@ fun ResultsScreen(vm: RaceViewModel) {
             ride?.let { r ->
                 HorizontalDivider()
                 RideStats(r)
+                Button(onClick = { sendToChatGpt() }, modifier = Modifier.fillMaxWidth()) {
+                    Text("Send to ChatGPT", fontWeight = FontWeight.Bold)
+                }
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Button(onClick = { saveFit.launch(vm.fitFileName()) }) { Text("Save .fit file") }
                     OutlinedButton(onClick = { shareFit() }) { Text("Share .fit") }
@@ -142,6 +192,9 @@ fun ResultsScreen(vm: RaceViewModel) {
         }
     }
 }
+
+private const val CHATGPT_PACKAGE = "com.openai.chatgpt"
+private const val MAX_INLINE_CSV = 90_000
 
 @Composable
 private fun RideStats(r: RideSummary) {

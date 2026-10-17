@@ -20,6 +20,11 @@
         android:name="android.permission.ACCESS_FINE_LOCATION"
         android:maxSdkVersion="30" />
 
+    <!-- Lets us check whether the ChatGPT app is installed (Android 11+ package visibility). -->
+    <queries>
+        <package android:name="com.openai.chatgpt" />
+    </queries>
+
     <uses-feature
         android:name="android.hardware.bluetooth_le"
         android:required="false" />

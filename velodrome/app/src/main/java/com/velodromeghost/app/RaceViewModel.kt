@@ -12,11 +12,14 @@ import com.velodromeghost.app.data.SettingsStore
 import com.velodromeghost.app.data.WorkoutEntry
 import com.velodromeghost.app.data.WorkoutRepository
 import com.velodromeghost.core.fit.FitWriter
+import com.velodromeghost.core.fit.RideCsv
 import com.velodromeghost.core.fit.RideRecorder
 import com.velodromeghost.core.fit.RideSummary
 import com.velodromeghost.core.physics.Physics
 import com.velodromeghost.core.physics.RiderParams
+import com.velodromeghost.core.race.Competitor
 import com.velodromeghost.core.race.RaceConfig
+import com.velodromeghost.core.race.RaceMode
 import com.velodromeghost.core.race.RaceEngine
 import com.velodromeghost.core.race.RacePhase
 import com.velodromeghost.core.race.RaceState
@@ -77,6 +80,10 @@ class RaceViewModel(app: Application) : AndroidViewModel(app) {
 
     private val _ride = MutableStateFlow<RideSummary?>(null)
     val ride: StateFlow<RideSummary?> = _ride.asStateFlow()
+
+    /** Set when a race finishes and the ride should be sent to ChatGPT automatically. */
+    private val _autoSendPending = MutableStateFlow(false)
+    val autoSendPending: StateFlow<Boolean> = _autoSendPending.asStateFlow()
 
     private var engine: RaceEngine? = null
     private var loop: Job? = null
@@ -172,6 +179,7 @@ class RaceViewModel(app: Application) : AndroidViewModel(app) {
             _paused.value = false
             recorder = RideRecorder()
             _ride.value = null
+            _autoSendPending.value = false
             raceStartUnixMs = 0L
             _race.value = newEngine.tick(0.0, 0.0, null)
             _screen.value = Screen.RACE
@@ -219,6 +227,7 @@ class RaceViewModel(app: Application) : AndroidViewModel(app) {
                     if (finishedAt == 0L) {
                         finishedAt = now
                         releaseResistance(s)
+                        if (s.autoSendToChatGpt && !s.demoMode && !recorder.isEmpty) _autoSendPending.value = true
                     } else if (now - finishedAt > 3_500_000_000L) {
                         _screen.value = Screen.RESULTS
                         break
@@ -273,6 +282,64 @@ class RaceViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    fun consumeAutoSend() {
+        _autoSendPending.value = false
+    }
+
+    /** What gets sent to ChatGPT: a readable summary plus the per-second data as a CSV file. */
+    class ChatGptPayload(val text: String, val csv: File, val csvText: String)
+
+    suspend fun chatGptPayload(): ChatGptPayload? {
+        if (recorder.isEmpty) return null
+        val r = recorder.summary()
+        val st = _race.value
+        val s = _settings.value
+        val start = if (raceStartUnixMs > 0) raceStartUnixMs else System.currentTimeMillis()
+        val text = buildString {
+            appendLine("Here's my indoor track cycling ride from Velodrome Ghost (Peloton + SmartSpin2k, racing a ghost rider on a virtual 250 m velodrome).")
+            appendLine()
+            appendLine("Date: " + SimpleDateFormat("EEE d MMM yyyy, HH:mm", Locale.UK).format(Date(start)))
+            if (st != null) {
+                val type = if (st.mode == RaceMode.SPRINT_1V1) "1v1 race" else "Omnium points race (sprint every ${s.sprintEveryLaps} laps)"
+                appendLine("Race: $type, ${st.totalLaps} laps (${st.raceDistanceMeters.roundToInt()} m)")
+                val result = when {
+                    st.phase != RacePhase.FINISHED -> "abandoned"
+                    st.winner == Competitor.RIDER -> "I won" + (st.marginSeconds?.let { " by %.2f s".format(Locale.UK, it) } ?: "")
+                    else -> "the ghost won" + (st.marginSeconds?.let { " by %.2f s".format(Locale.UK, it) } ?: "")
+                }
+                appendLine("Result: $result")
+                if (st.mode == RaceMode.OMNIUM_POINTS) {
+                    appendLine("Points: me ${st.riderTotalPoints}, ghost ${st.ghostTotalPoints} (sprints won ${st.sprints.count { it.winner == Competitor.RIDER }}/${st.sprints.size})")
+                }
+            }
+            appendLine("Ghost: ${s.ghostStrengthPct}% of my FTP, pacing: ${activeWorkout?.name ?: "constant ${s.constantPacePct}% FTP"}")
+            appendLine()
+            appendLine("Ride time: ${formatClock(r.durationSec)}")
+            appendLine("Distance: %.2f km".format(Locale.UK, r.distanceM / 1000))
+            appendLine("Avg power: ${r.avgPowerWatts.roundToInt()} W (max ${r.maxPowerWatts} W)")
+            appendLine("Avg cadence: ${r.avgCadenceRpm?.roundToInt()?.let { "$it rpm" } ?: "n/a"}" + (r.maxCadenceRpm?.let { " (max $it rpm)" } ?: ""))
+            appendLine("Total work: %.1f kJ".format(Locale.UK, r.totalWorkKj))
+            appendLine("Calories: ${r.kcal.roundToInt()} kcal")
+            r.avgHeartRate?.let { appendLine("Avg heart rate: $it bpm (max ${r.maxHeartRate} bpm)") }
+            appendLine("Avg speed: %.1f km/h".format(Locale.UK, r.avgSpeedMps * 3.6))
+            appendLine("My FTP: ${s.ftpWatts} W, weight ${s.riderWeightKg} kg")
+            appendLine()
+            append("Per-second data is in the attached CSV. Please analyse my ride and pacing, and tell me how to beat the ghost next time.")
+        }
+        val csvText = RideCsv.write(recorder.samples)
+        val name = fitFileName().removeSuffix(".fit") + ".csv"
+        val csv = withContext(Dispatchers.IO) {
+            val dir = File(getApplication<Application>().cacheDir, "exports").apply { mkdirs() }
+            File(dir, name).apply { writeText(csvText) }
+        }
+        return ChatGptPayload(text, csv, csvText)
+    }
+
+    private fun formatClock(sec: Double): String {
+        val t = sec.roundToInt()
+        return if (t >= 3600) "%d:%02d:%02d".format(t / 3600, t / 60 % 60, t % 60) else "%d:%02d".format(t / 60, t % 60)
+    }
+
     /** Writes the .fit into the app cache for sharing (Strava, Garmin Connect, email...). */
     suspend fun fitFileForSharing(): File? {
         if (recorder.isEmpty) return null
@@ -280,7 +347,7 @@ class RaceViewModel(app: Application) : AndroidViewModel(app) {
         val name = fitFileName()
         return withContext(Dispatchers.IO) {
             val dir = File(getApplication<Application>().cacheDir, "exports").apply { mkdirs() }
-            dir.listFiles()?.forEach { it.delete() }
+            dir.listFiles { f -> f.extension == "fit" }?.forEach { it.delete() }
             File(dir, name).apply { writeBytes(bytes) }
         }
     }

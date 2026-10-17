@@ -100,6 +100,21 @@ Built-in workouts (`app/src/main/assets/workouts/`): *Match Sprint – Cat and M
 Race – 40 laps*, *Kilo Time Trial – 4 laps*, *Tempo Race – Surges*. They're also good templates for
 writing your own.
 
+## Send to ChatGPT
+
+When a race finishes, the app opens the **ChatGPT** app with a message ready to send. The message
+holds a summary of the race and ride (result, avg power, avg cadence, total work, distance, kcal,
+heart rate, your FTP) and a request to analyse your pacing. The per-second data comes as a
+`.csv` file attached to the message. Review it and press send.
+
+- To stop it opening automatically, switch off *Send ride to ChatGPT automatically* in setup. The
+  **Send to ChatGPT** button stays on the results screen.
+- If ChatGPT won't accept the file, the CSV data goes into the message text instead.
+- If the ChatGPT app isn't installed, you get the normal share menu.
+- Races in demo mode never open ChatGPT automatically.
+
+OpenAI doesn't let other apps post into your ChatGPT account directly, so the last tap is always yours.
+
 ## Exported .fit files
 
 The file holds a standard FIT *activity*: one record per second (power, cadence, heart rate,

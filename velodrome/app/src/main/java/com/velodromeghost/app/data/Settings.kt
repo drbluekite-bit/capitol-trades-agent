@@ -26,6 +26,8 @@ data class AppSettings(
     val workoutId: String? = null,
     val resistance: ResistanceMode = ResistanceMode.SIM,
     val demoMode: Boolean = false,
+    /** Open the ChatGPT app with the ride attached as soon as a race finishes. */
+    val autoSendToChatGpt: Boolean = true,
     val lastDeviceAddress: String? = null,
     val lastDeviceName: String? = null,
 ) {
@@ -53,6 +55,7 @@ class SettingsStore(context: Context) {
             workoutId = prefs.getString("workout", null),
             resistance = enumOr(prefs.getString("resistance", null), d.resistance),
             demoMode = prefs.getBoolean("demo", d.demoMode),
+            autoSendToChatGpt = prefs.getBoolean("autoChatGpt", d.autoSendToChatGpt),
             lastDeviceAddress = prefs.getString("deviceAddress", null),
             lastDeviceName = prefs.getString("deviceName", null),
         )
@@ -75,6 +78,7 @@ class SettingsStore(context: Context) {
             .putString("workout", s.workoutId)
             .putString("resistance", s.resistance.name)
             .putBoolean("demo", s.demoMode)
+            .putBoolean("autoChatGpt", s.autoSendToChatGpt)
             .putString("deviceAddress", s.lastDeviceAddress)
             .putString("deviceName", s.lastDeviceName)
             .apply()
