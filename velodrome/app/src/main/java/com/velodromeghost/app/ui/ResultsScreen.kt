@@ -1,5 +1,9 @@
 package com.velodromeghost.app.ui
 
+import android.content.Intent
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,7 +20,14 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.FileProvider
+import com.velodromeghost.core.fit.RideSummary
+import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -34,6 +45,35 @@ import com.velodromeghost.core.race.RacePhase
 fun ResultsScreen(vm: RaceViewModel) {
     val raceState by vm.race.collectAsStateWithLifecycle()
     val st = raceState
+    val ride by vm.ride.collectAsStateWithLifecycle()
+    val message by vm.message.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
+    LaunchedEffect(message) {
+        message?.let {
+            Toast.makeText(context, it, Toast.LENGTH_LONG).show()
+            vm.consumeMessage()
+        }
+    }
+
+    val saveFit = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/octet-stream")
+    ) { uri -> if (uri != null) vm.exportFit(uri) }
+
+    fun shareFit() {
+        scope.launch {
+            val file = vm.fitFileForSharing() ?: return@launch
+            val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+            val send = Intent(Intent.ACTION_SEND).apply {
+                type = "application/octet-stream"
+                putExtra(Intent.EXTRA_STREAM, uri)
+                putExtra(Intent.EXTRA_SUBJECT, file.name)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            context.startActivity(Intent.createChooser(send, "Share .fit file"))
+        }
+    }
 
     Box(Modifier.fillMaxSize().safeDrawingPadding(), contentAlignment = Alignment.TopCenter) {
         Column(
@@ -81,6 +121,19 @@ fun ResultsScreen(vm: RaceViewModel) {
                     Line("TOTAL", "You ${st.riderTotalPoints}  ·  Ghost ${st.ghostTotalPoints}", bold = true)
                 }
             }
+            ride?.let { r ->
+                HorizontalDivider()
+                RideStats(r)
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Button(onClick = { saveFit.launch(vm.fitFileName()) }) { Text("Save .fit file") }
+                    OutlinedButton(onClick = { shareFit() }) { Text("Share .fit") }
+                }
+                Text(
+                    "Upload the .fit to Strava, Garmin Connect, TrainingPeaks or intervals.icu.",
+                    fontSize = 12.sp,
+                    color = Palette.muted,
+                )
+            }
             HorizontalDivider()
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Button(onClick = { vm.startRace() }) { Text("Race again") }
@@ -88,6 +141,18 @@ fun ResultsScreen(vm: RaceViewModel) {
             }
         }
     }
+}
+
+@Composable
+private fun RideStats(r: RideSummary) {
+    Text("Your ride", fontWeight = FontWeight.Bold, color = Palette.accent, fontSize = 20.sp)
+    Line("Avg cadence", r.avgCadenceRpm?.let { "${it.roundToInt()} rpm" } ?: "--")
+    Line("Avg power", "${r.avgPowerWatts.roundToInt()} W  (max ${r.maxPowerWatts} W)")
+    Line("Total work", "%.1f kJ".format(r.totalWorkKj))
+    Line("Total distance", "%.2f km".format(r.distanceM / 1000))
+    Line("Calories", "${r.kcal.roundToInt()} kcal")
+    r.avgHeartRate?.let { Line("Avg heart rate", "$it bpm") }
+    Line("Ride time", formatDuration(r.durationSec))
 }
 
 @Composable

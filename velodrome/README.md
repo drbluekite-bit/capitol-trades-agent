@@ -22,6 +22,10 @@ A simple Android app for racing a pace-setting **ghost rider** round a 250 m vel
   - **ERG:** SmartSpin2k holds the workout's power, scaled to *your* FTP, so the `.zwo` sets your effort while the ghost rides it too.
   - **No control:** you set resistance with the knob.
 - **Demo mode** with an on-screen power slider, for trying the app without the bike.
+- **.fit export.** After a race (even an abandoned one) the results screen shows your **avg cadence,
+  avg power, total work (kJ), total distance and calories**. **Save .fit file** or **Share .fit**
+  then gives you a Garmin FIT activity file you can upload to Strava, Garmin Connect,
+  TrainingPeaks or intervals.icu. See [Exported .fit files](#exported-fit-files).
 
 ## How it connects
 
@@ -95,6 +99,21 @@ The workouts are timed in seconds, but sprints happen at fixed laps. For an omni
 Built-in workouts (`app/src/main/assets/workouts/`): *Match Sprint – Cat and Mouse*, *Omnium Points
 Race – 40 laps*, *Kilo Time Trial – 4 laps*, *Tempo Race – Surges*. They're also good templates for
 writing your own.
+
+## Exported .fit files
+
+The file holds a standard FIT *activity*: one record per second (power, cadence, heart rate,
+speed, distance), plus a lap and a session summary marked as indoor cycling.
+
+| Value | How it's worked out |
+| --- | --- |
+| Avg cadence | Average of your non-zero cadence readings (coasting isn't counted, as on Garmin) |
+| Avg power | Total work ÷ ride time, zeros included |
+| Total work ("total watts") | Your power added up over the whole ride, in kJ (1 W for 1 s = 1 J) |
+| Total distance | Your distance round the track |
+| Calories | Total work ÷ 4.184 ÷ 24 % efficiency, the usual bike-computer estimate (about 1 kcal per kJ) |
+
+Ride time is race time, so pauses don't count. The countdown isn't recorded.
 
 ## Building it yourself
 
