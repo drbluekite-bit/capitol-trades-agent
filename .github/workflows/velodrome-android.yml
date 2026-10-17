@@ -44,16 +44,18 @@ jobs:
           name: velodrome-ghost-apk
           path: velodrome/velodrome-ghost.apk
 
-      # Easy phone/tablet download: the latest build is attached to the "velodrome-latest" pre-release.
-      - name: Publish to pre-release
+      # Each build gets its own release, so a download in progress is never replaced mid-way.
+      - name: Publish release
         if: github.event_name != 'pull_request'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: velodrome-latest
-          name: Velodrome Ghost (latest build)
+          tag_name: velodrome-build-${{ github.run_number }}
+          target_commitish: ${{ github.sha }}
+          name: Velodrome Ghost build #${{ github.run_number }}
           prerelease: true
           make_latest: false
           body: |
-            Latest Velodrome Ghost Android build from `${{ github.ref_name }}` (${{ github.sha }}).
-            Download `velodrome-ghost.apk` on your phone and open it to install.
+            Velodrome Ghost Android build #${{ github.run_number }} from `${{ github.ref_name }}` (${{ github.sha }}).
+            Download `velodrome-ghost.apk` below on your phone and open it to install
+            (allow "install unknown apps" for your browser / My Files; turn off Samsung Auto Blocker if it blocks it).
           files: velodrome/velodrome-ghost.apk

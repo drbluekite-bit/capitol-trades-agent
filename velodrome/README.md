@@ -52,9 +52,11 @@ Tips:
 ### Samsung Galaxy S22 Ultra (easiest)
 
 1. Every push to this branch builds the app in GitHub Actions (`.github/workflows/velodrome-android.yml`).
-2. On the phone, open the repo's **Releases** page, find **"Velodrome Ghost (latest build)"**
-   (tag `velodrome-latest`) and download **`velodrome-ghost.apk`**. You can also download it from the
-   *Artifacts* section of the latest Actions run.
+2. On the phone, open the repo's **Releases** page and find the newest **"Velodrome Ghost build #N"**
+   (marked *Pre-release*; the repo's "Latest" badge belongs to another app). Under **Assets**,
+   download **`velodrome-ghost.apk`**. Each build has its own release, so a file is never replaced
+   while you're downloading it. You can also download it from the *Artifacts* section of the
+   latest Actions run.
 3. Open the APK. Android will ask you to allow installs from your browser or file manager
    (*Settings → Apps → Special access → Install unknown apps*). Allow it, then tap **Install**.
 4. Open **Velodrome Ghost** and grant the *Nearby devices* (Bluetooth) permission when asked.
