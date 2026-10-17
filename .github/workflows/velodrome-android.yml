@@ -51,7 +51,7 @@ jobs:
         with:
           tag_name: velodrome-build-${{ github.run_number }}
           target_commitish: ${{ github.sha }}
-          name: Velodrome Ghost build #${{ github.run_number }}
+          name: "Velodrome Ghost build #${{ github.run_number }}"
           prerelease: true
           make_latest: false
           body: |
