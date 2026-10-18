@@ -14,11 +14,16 @@ import kotlin.math.max
  */
 class RaceEngine(val config: RaceConfig) {
     private val track = config.track
+    private val lap = track.lapLength
+    private val mode = config.mode
     private val riderParams = RiderParams(config.riderMassKg)
     private val ghostParams = RiderParams(config.ghostMassKg)
     private val sprintLines = config.sprintLines()
     private val ghostLines = config.ghostTargetLines()
     private val raceDistance = config.raceDistanceMeters
+    private val ghostStart = config.ghostStartMeters
+    private val ghostFinishLine = config.ghostFinishMeters
+    private val changeMeters = config.madisonChangeLaps.coerceAtLeast(0.5) * lap
 
     private var phase = RacePhase.COUNTDOWN
     private var countdown = config.countdownSeconds
@@ -32,13 +37,16 @@ class RaceEngine(val config: RaceConfig) {
     private var rDraft = false
     private var rFinish: Double? = null
 
-    private var gDist = config.ghostHeadStartMeters
+    private var gDist = ghostStart
     private var gSpeed = 0.0
     private var gPower = 0.0
     private var gCadence = 0.0
     private var gCrank = PI / 2
     private var gDraft = false
     private var gFinish: Double? = null
+
+    private var partnerActive = false
+    private var partnerPower = 0.0
 
     private var nextSprint = 0
     private val sprints = mutableListOf<SprintResult>()
@@ -53,6 +61,7 @@ class RaceEngine(val config: RaceConfig) {
 
     private var winner: Competitor? = null
     private var margin: Double? = null
+    private var caughtBy: Competitor? = null
 
     val isFinished: Boolean get() = phase == RacePhase.FINISHED
 
@@ -66,7 +75,7 @@ class RaceEngine(val config: RaceConfig) {
                 if (countdown <= 0.0) {
                     phase = RacePhase.RACING
                     countdown = 0.0
-                    announce("GO!")
+                    announce(if (mode == RaceMode.MADISON) "GO! Your turn first" else "GO!")
                 }
             }
             RacePhase.RACING -> {
@@ -87,42 +96,65 @@ class RaceEngine(val config: RaceConfig) {
     private fun substep(h: Double, riderCadence: Double?) {
         elapsed += h
         gPower = ghostPowerAt()
+        partnerPower = if (mode == RaceMode.MADISON) partnerPowerAt() else 0.0
 
-        val ghostAhead = track.wrappedDelta(rDist, gDist)
+        // Nobody drafts in a pursuit: you're half a lap apart until someone is caught.
+        val ghostAhead = if (mode.isPursuit) 0.0 else track.wrappedDelta(rDist, gDist)
         rDraft = ghostAhead > 0 && ghostAhead < Physics.DRAFT_RANGE_METERS
         gDraft = -ghostAhead > 0 && -ghostAhead < Physics.DRAFT_RANGE_METERS
         val rFactor = Physics.draftFactor(ghostAhead)
         val gFactor = Physics.draftFactor(-ghostAhead)
 
+        val teamPower = if (partnerActive) partnerPower else rPower
         val prevR = rDist
         val prevG = gDist
-        rSpeed = Physics.step(rSpeed, rPower, riderParams, rFactor, h)
+        rSpeed = Physics.step(rSpeed, teamPower, riderParams, rFactor, h)
         gSpeed = Physics.step(gSpeed, gPower, ghostParams, gFactor, h)
         rDist += rSpeed * h
         gDist += gSpeed * h
 
-        rCadence = riderCadence ?: Physics.cadenceForSpeed(rSpeed)
+        rCadence = riderCadence ?: if (partnerActive) 0.0 else Physics.cadenceForSpeed(rSpeed)
         gCadence = Physics.cadenceForSpeed(gSpeed)
         rCrank = (rCrank + rCadence / 60.0 * 2 * PI * h) % (2 * PI)
         gCrank = (gCrank + gCadence / 60.0 * 2 * PI * h) % (2 * PI)
 
+        checkMadisonChange()
         checkSprints(prevR, prevG)
         checkLapGains()
         checkLapAnnouncements()
-        checkFinish(prevR, prevG, h)
+        if (mode.isPursuit && gFinish == null) checkCatch()
+        if (phase == RacePhase.RACING) checkFinish(prevR, prevG, h)
     }
 
+    /** Ghost's FTP-scaled power for this moment of the race. */
     private fun ghostPowerAt(): Double {
         val ftp = config.ghostFtpWatts
         if (gFinish != null) return 0.45 * ftp
         val base = config.workout?.targetWatts(elapsed, ftp) ?: (config.constantGhostFraction * ftp)
-        if (config.ghostAttacksSprints) {
-            val line = ghostLines.firstOrNull { it > gDist }
-            if (line != null && line - gDist <= config.ghostKickDistanceMeters) {
-                return max(base, config.ghostSprintFraction * ftp)
-            }
+        return if (config.ghostAttacksSprints) kick(base, ftp, gDist) else base
+    }
+
+    /** Your virtual Madison partner rides the same pacing, and always contests the sprints. */
+    private fun partnerPowerAt(): Double {
+        val ftp = config.partnerFtpWatts
+        val base = config.workout?.targetWatts(elapsed, ftp) ?: (config.constantGhostFraction * ftp)
+        return kick(base, ftp, rDist)
+    }
+
+    private fun kick(base: Double, ftp: Double, position: Double): Double {
+        val line = ghostLines.firstOrNull { it > position } ?: return base
+        return if (line - position <= config.effectiveKickDistance) max(base, config.ghostSprintFraction * ftp) else base
+    }
+
+    private fun checkMadisonChange() {
+        if (mode != RaceMode.MADISON) return
+        val nowPartner = floor(rDist / changeMeters).toInt() % 2 == 1
+        if (nowPartner != partnerActive) {
+            partnerActive = nowPartner
+            // The hand-sling throws the incoming rider into the race.
+            rSpeed += SLING_BOOST_MPS
+            announce(if (partnerActive) "Hand-sling! Partner's turn - recover" else "Hand-sling! YOUR TURN - go!")
         }
-        return base
     }
 
     /** Fraction of the substep at which a rider moving prev -> now crossed [line]. */
@@ -143,12 +175,10 @@ class RaceEngine(val config: RaceConfig) {
                 else -> Competitor.GHOST
             }
             val isFinal = nextSprint == sprintLines.lastIndex
-            val mult = if (isFinal) 2 else 1
-            val first = RaceConfig.SPRINT_POINTS_FIRST * mult
-            val second = RaceConfig.SPRINT_POINTS_SECOND * mult
+            val (first, second) = config.sprintPoints(nextSprint, sprintLines.size)
             val result = SprintResult(
                 number = nextSprint + 1,
-                lap = (line / track.lapLength).toInt(),
+                lap = (line / lap).toInt(),
                 winner = sprintWinner,
                 riderPoints = if (sprintWinner == Competitor.RIDER) first else second,
                 ghostPoints = if (sprintWinner == Competitor.GHOST) first else second,
@@ -157,18 +187,24 @@ class RaceEngine(val config: RaceConfig) {
             sprints += result
             riderSprintPoints += result.riderPoints
             ghostSprintPoints += result.ghostPoints
-            val label = if (isFinal) "Final sprint" else "Sprint ${result.number}"
+            val team = if (mode == RaceMode.MADISON) "your team" else "YOU"
             announce(
-                if (sprintWinner == Competitor.RIDER) "$label: YOU take it! +$first"
-                else "$label: ghost takes it. +$second for you"
+                when {
+                    mode == RaceMode.TEMPO ->
+                        if (sprintWinner == Competitor.RIDER) "Lap ${result.lap}: point to you!" else "Lap ${result.lap}: point to the ghost"
+                    sprintWinner == Competitor.RIDER ->
+                        "${if (isFinal) "Final sprint" else "Sprint ${result.number}"}: $team take it! +$first"
+                    else ->
+                        "${if (isFinal) "Final sprint" else "Sprint ${result.number}"}: ghost takes it. +$second for $team"
+                }
             )
             nextSprint++
         }
     }
 
     private fun lapPointsDiff(): Int {
-        if (config.mode != RaceMode.OMNIUM_POINTS) return 0
-        val laps = (rDist - gDist) / track.lapLength
+        if (!mode.isPointsBased) return 0
+        val laps = (rDist - gDist) / lap
         return if (laps >= 0) floor(laps).toInt() else -floor(-laps).toInt()
     }
 
@@ -185,33 +221,44 @@ class RaceEngine(val config: RaceConfig) {
     }
 
     private fun checkLapAnnouncements() {
-        val lapsDone = (rDist / track.lapLength).toInt()
+        val lapsDone = (rDist / lap).toInt()
         if (lapsDone <= lastAnnouncedLap || rFinish != null) return
         lastAnnouncedLap = lapsDone
         val toGo = config.laps - lapsDone
+        val nextLine = sprintLines.getOrNull(nextSprint)
+        val lapsToSprint = nextLine?.let { ((it - lapsDone * lap) / lap).toInt() }
         when {
             toGo == 1 -> announce("BELL - final lap!")
             toGo <= 0 -> Unit
-            config.mode == RaceMode.OMNIUM_POINTS -> {
-                val nextLine = sprintLines.getOrNull(nextSprint)
-                val lapsToSprint = nextLine?.let { ((it - lapsDone * track.lapLength) / track.lapLength).toInt() }
-                when (lapsToSprint) {
-                    1 -> announce("Bell - sprint next lap!")
-                    else -> announce("$toGo laps to go")
-                }
-            }
+            mode == RaceMode.TEMPO && lapsToSprint == 1 && sprints.isEmpty() -> announce("Points every lap from now!")
+            (mode == RaceMode.POINTS_RACE || mode == RaceMode.MADISON) && lapsToSprint == 1 ->
+                announce("Bell - sprint next lap!")
             else -> announce("$toGo laps to go")
         }
     }
 
+    private fun checkCatch() {
+        val caught = when {
+            rDist >= gDist -> Competitor.RIDER
+            gDist - rDist >= lap -> Competitor.GHOST
+            else -> return
+        }
+        caughtBy = caught
+        winner = caught
+        margin = null
+        phase = RacePhase.FINISHED
+        if (caught == Competitor.RIDER) rFinish = elapsed
+        announce(if (caught == Competitor.RIDER) "You caught the ghost! You win!" else "The ghost caught you")
+    }
+
     private fun checkFinish(prevR: Double, prevG: Double, h: Double) {
-        if (gFinish == null && gDist >= raceDistance) {
-            gFinish = elapsed - h + h * crossFraction(prevG, gDist, raceDistance)
+        if (gFinish == null && gDist >= ghostFinishLine) {
+            gFinish = elapsed - h + h * crossFraction(prevG, gDist, ghostFinishLine)
         }
         if (rFinish == null && rDist >= raceDistance) {
             rFinish = elapsed - h + h * crossFraction(prevR, rDist, raceDistance)
         }
-        if (gFinish != null && rFinish == null && !ghostFinishAnnounced && config.mode == RaceMode.SPRINT_1V1) {
+        if (gFinish != null && rFinish == null && !ghostFinishAnnounced && !mode.isPointsBased) {
             ghostFinishAnnounced = true
             announce("Ghost has crossed the line - keep going!")
         }
@@ -219,23 +266,21 @@ class RaceEngine(val config: RaceConfig) {
         phase = RacePhase.FINISHED
         val gTime = gFinish
         val ghostMargin = gTime?.let { rTime - it }
-            ?: -((raceDistance - gDist) / max(gSpeed, 1.0))
-        when (config.mode) {
-            RaceMode.SPRINT_1V1 -> {
-                winner = if (gTime != null && gTime < rTime) Competitor.GHOST else Competitor.RIDER
-                margin = abs(ghostMargin)
+            ?: -((ghostFinishLine - gDist) / max(gSpeed, 1.0))
+        val ghostFirst = gTime != null && gTime < rTime
+        winner = if (mode.isPointsBased) {
+            val rTotal = riderSprintPoints + riderLapPoints()
+            val gTotal = ghostSprintPoints + ghostLapPoints()
+            when {
+                rTotal > gTotal -> Competitor.RIDER
+                gTotal > rTotal -> Competitor.GHOST
+                // Tie: decided by the finish placing.
+                else -> if (ghostFirst) Competitor.GHOST else Competitor.RIDER
             }
-            RaceMode.OMNIUM_POINTS -> {
-                val rTotal = riderSprintPoints + riderLapPoints()
-                val gTotal = ghostSprintPoints + ghostLapPoints()
-                winner = when {
-                    rTotal > gTotal -> Competitor.RIDER
-                    gTotal > rTotal -> Competitor.GHOST
-                    else -> sprints.lastOrNull()?.winner ?: Competitor.RIDER
-                }
-                margin = abs(ghostMargin)
-            }
+        } else {
+            if (ghostFirst) Competitor.GHOST else Competitor.RIDER
         }
+        margin = abs(ghostMargin)
         announce(if (winner == Competitor.RIDER) "You win!" else "The ghost wins")
     }
 
@@ -248,12 +293,16 @@ class RaceEngine(val config: RaceConfig) {
     }
 
     private fun snapshot(): RaceState {
-        val gap = rDist - gDist
+        val gap = if (mode.isPursuit) rDist - (gDist - ghostStart) else rDist - gDist
         val gapSec = if (gap >= 0) gap / max(gSpeed, 1.0) else gap / max(rSpeed, 1.0)
-        val riderTarget = config.workout?.targetWatts(elapsed, config.riderFtpWatts)
-            ?: (config.constantGhostFraction * config.riderFtpWatts)
+        val riderTarget = when {
+            partnerActive -> 0.5 * config.riderFtpWatts
+            else -> config.workout?.targetWatts(elapsed, config.riderFtpWatts)
+                ?: (config.constantGhostFraction * config.riderFtpWatts)
+        }
+        val madison = mode == RaceMode.MADISON
         return RaceState(
-            mode = config.mode,
+            mode = mode,
             phase = phase,
             countdownRemaining = countdown,
             elapsedSec = elapsed,
@@ -262,25 +311,30 @@ class RaceEngine(val config: RaceConfig) {
             gapMeters = gap,
             gapSeconds = gapSec,
             raceDistanceMeters = raceDistance,
-            lapLength = track.lapLength,
+            lapLength = lap,
             totalLaps = config.laps,
             sprints = sprints.toList(),
-            nextSprintLap = sprintLines.getOrNull(nextSprint)?.let { (it / track.lapLength).toInt() },
+            nextSprintLap = sprintLines.getOrNull(nextSprint)?.let { (it / lap).toInt() },
             riderSprintPoints = riderSprintPoints,
             ghostSprintPoints = ghostSprintPoints,
             riderLapPoints = riderLapPoints(),
             ghostLapPoints = ghostLapPoints(),
             ghostTargetWatts = if (phase == RacePhase.RACING) gPower else ghostPowerAt(),
             riderTargetWatts = riderTarget,
-            targetCadence = config.workout?.cadenceAt(elapsed),
+            targetCadence = if (partnerActive) null else config.workout?.cadenceAt(elapsed),
             announcement = announcement,
             announcementAtSec = announcementAt,
             winner = winner,
             marginSeconds = margin,
+            partnerActive = if (madison) partnerActive else null,
+            metersToChange = if (madison) changeMeters - (rDist % changeMeters) else null,
+            partnerPowerWatts = partnerPower,
+            caughtBy = caughtBy,
         )
     }
 
     private companion object {
         const val SUBSTEP = 0.02
+        const val SLING_BOOST_MPS = 0.8
     }
 }

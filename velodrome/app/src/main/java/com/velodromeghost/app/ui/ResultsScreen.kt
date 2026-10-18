@@ -37,7 +37,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.velodromeghost.app.Palette
+import com.velodromeghost.app.RaceSession
 import com.velodromeghost.app.RaceViewModel
+import com.velodromeghost.core.race.Omnium
 import com.velodromeghost.core.race.Competitor
 import com.velodromeghost.core.race.RaceMode
 import com.velodromeghost.core.race.RacePhase
@@ -47,6 +49,7 @@ fun ResultsScreen(vm: RaceViewModel) {
     val raceState by vm.race.collectAsStateWithLifecycle()
     val st = raceState
     val ride by vm.ride.collectAsStateWithLifecycle()
+    val session by vm.session.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -132,6 +135,7 @@ fun ResultsScreen(vm: RaceViewModel) {
             } else {
                 val finished = st.phase == RacePhase.FINISHED
                 val youWon = st.winner == Competitor.RIDER
+                Text(st.mode.label.uppercase(), color = Palette.muted, fontWeight = FontWeight.Bold)
                 Text(
                     when {
                         !finished -> "Race abandoned"
@@ -142,23 +146,34 @@ fun ResultsScreen(vm: RaceViewModel) {
                     fontWeight = FontWeight.Black,
                     color = if (youWon) Palette.good else Palette.ghost,
                 )
-                st.marginSeconds?.let {
-                    Text("by %.2f s".format(it), fontSize = 22.sp, color = Color.White)
+                when (st.caughtBy) {
+                    Competitor.RIDER -> Text("You caught the ghost", fontSize = 22.sp, color = Color.White)
+                    Competitor.GHOST -> Text("The ghost caught you", fontSize = 22.sp, color = Color.White)
+                    null -> st.marginSeconds?.let {
+                        Text("by %.2f s".format(it), fontSize = 22.sp, color = Color.White)
+                    }
                 }
                 HorizontalDivider()
                 Line("Distance", "%.0f m (%d laps)".format(st.raceDistanceMeters, st.totalLaps))
                 st.rider.finishTimeSec?.let { Line("Your time", formatTime(it)) }
-                Line("Ghost time", st.ghost.finishTimeSec?.let(::formatTime) ?: "still racing")
+                Line(
+                    "Ghost time",
+                    st.ghost.finishTimeSec?.let(::formatTime) ?: if (st.caughtBy != null) "caught" else "still racing",
+                )
                 st.rider.finishTimeSec?.let { t ->
                     Line("Your average speed", "%.1f km/h".format(st.raceDistanceMeters / t * 3.6))
                 }
 
-                if (st.mode == RaceMode.OMNIUM_POINTS) {
+                if (st.mode.isPointsBased) {
                     HorizontalDivider()
-                    Text("Points race", fontWeight = FontWeight.Bold, color = Palette.accent, fontSize = 20.sp)
+                    Text("Points", fontWeight = FontWeight.Bold, color = Palette.accent, fontSize = 20.sp)
                     st.sprints.forEach { sprint ->
                         Line(
-                            (if (sprint.isFinal) "Final sprint (x2)" else "Sprint ${sprint.number}") + " · lap ${sprint.lap}",
+                            when {
+                                st.mode == RaceMode.TEMPO -> "Lap ${sprint.lap}"
+                                sprint.isFinal -> "Final sprint (x2) · lap ${sprint.lap}"
+                                else -> "Sprint ${sprint.number} · lap ${sprint.lap}"
+                            },
                             (if (sprint.winner == Competitor.RIDER) "You" else "Ghost") +
                                 "   (you ${sprint.riderPoints} / ghost ${sprint.ghostPoints})",
                         )
@@ -168,6 +183,7 @@ fun ResultsScreen(vm: RaceViewModel) {
                     Line("TOTAL", "You ${st.riderTotalPoints}  ·  Ghost ${st.ghostTotalPoints}", bold = true)
                 }
             }
+            session?.takeIf { it.isOmnium }?.let { OmniumStandings(it) }
             ride?.let { r ->
                 HorizontalDivider()
                 RideStats(r)
@@ -185,11 +201,51 @@ fun ResultsScreen(vm: RaceViewModel) {
                 )
             }
             HorizontalDivider()
+            session?.takeIf { it.hasNext }?.let { sess ->
+                Button(onClick = { vm.nextEvent() }, modifier = Modifier.fillMaxWidth()) {
+                    Text("Next event: ${sess.events[sess.index + 1].mode.label}", fontWeight = FontWeight.Bold)
+                }
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Button(onClick = { vm.startRace() }) { Text("Race again") }
+                Button(onClick = { vm.startRace() }) {
+                    Text(if (session?.isOmnium == true) "Restart omnium" else "Race again")
+                }
                 OutlinedButton(onClick = { vm.backToSetup() }) { Text("Change setup") }
             }
         }
+    }
+}
+
+@Composable
+private fun OmniumStandings(session: RaceSession) {
+    HorizontalDivider()
+    val done = session.isComplete
+    Text(
+        if (done) "OMNIUM FINAL" else "Omnium after ${session.results.size} of ${session.events.size}",
+        fontWeight = FontWeight.Bold,
+        color = Palette.accent,
+        fontSize = 20.sp,
+    )
+    session.events.forEachIndexed { i, event ->
+        val r = session.results.getOrNull(i)
+        Line(
+            "${i + 1}. ${event.mode.label}",
+            when {
+                r == null -> "to come"
+                !r.finished -> "abandoned"
+                else -> "you ${r.riderPoints} · ghost ${r.ghostPoints}"
+            },
+        )
+    }
+    Line("TOTAL", "You ${Omnium.riderTotal(session.results)}  ·  Ghost ${Omnium.ghostTotal(session.results)}", bold = true)
+    if (done) {
+        val winner = Omnium.overallWinner(session.results)
+        Text(
+            if (winner == Competitor.RIDER) "You win the omnium!" else "The ghost wins the omnium",
+            fontSize = 26.sp,
+            fontWeight = FontWeight.Black,
+            color = if (winner == Competitor.RIDER) Palette.good else Palette.ghost,
+        )
     }
 }
 

@@ -1,0 +1,24 @@
+<workout_file>
+  <author>Velodrome Ghost</author>
+  <name>Individual Pursuit - 4 km</name>
+  <description>Classic pursuit pacing for 16 laps (about 4:45 at 50 km/h): a hard standing start, settle onto an even schedule, then empty the tank over the last two laps.</description>
+  <sportType>bike</sportType>
+  <tags>
+    <tag name="TRACK"/>
+    <tag name="PURSUIT"/>
+  </tags>
+  <workout>
+    <SteadyState Duration="12" Power="1.90" Cadence="100">
+      <textevent timeoffset="0" message="Standing start - get it rolling!"/>
+    </SteadyState>
+    <Ramp Duration="18" PowerLow="1.40" PowerHigh="1.15" Cadence="110"/>
+    <SteadyState Duration="210" Power="1.10" Cadence="110">
+      <textevent timeoffset="2" message="Settle into the schedule"/>
+      <textevent timeoffset="120" message="Halfway - hold the line"/>
+    </SteadyState>
+    <SteadyState Duration="40" Power="1.25" Cadence="115">
+      <textevent timeoffset="0" message="Two laps to go - empty it!"/>
+    </SteadyState>
+    <Cooldown Duration="120" PowerLow="0.60" PowerHigh="0.35" Cadence="85"/>
+  </workout>
+</workout_file>

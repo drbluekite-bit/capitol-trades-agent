@@ -51,8 +51,8 @@ import com.velodromeghost.app.Palette
 import com.velodromeghost.app.RaceViewModel
 import com.velodromeghost.app.ble.ConnectionState
 import com.velodromeghost.app.data.AppSettings
+import com.velodromeghost.app.data.RaceType
 import com.velodromeghost.app.data.ResistanceMode
-import com.velodromeghost.core.race.RaceMode
 import kotlin.math.roundToInt
 
 private fun bluetoothPermissions(): Array<String> =
@@ -238,27 +238,67 @@ private fun ConnectionCard(vm: RaceViewModel, s: AppSettings) {
 @Composable
 private fun RaceTypeCard(vm: RaceViewModel, s: AppSettings) {
     Section("2 · Race") {
-        RadioRow(
-            "1 v 1 race",
-            "Head to head against the ghost. First across the line wins.",
-            s.mode == RaceMode.SPRINT_1V1,
-        ) { vm.update { it.copy(mode = RaceMode.SPRINT_1V1) } }
-        RadioRow(
-            "Omnium points race",
-            "Long paced race with a sprint every few laps (5 / 3 pts), double points at the finish, +20 for lapping the ghost.",
-            s.mode == RaceMode.OMNIUM_POINTS,
-        ) { vm.update { it.copy(mode = RaceMode.OMNIUM_POINTS) } }
+        RaceType.entries.forEach { type ->
+            RadioRow(type.label, type.help, s.raceType == type) { vm.update { it.copy(raceType = type) } }
+        }
         HorizontalDivider()
-        if (s.mode == RaceMode.SPRINT_1V1) {
-            Stepper("Laps", s.sprintLaps, 1..40, suffix = " (${s.sprintLaps * 250} m)") { v ->
-                vm.update { it.copy(sprintLaps = v) }
+        when (s.raceType) {
+            RaceType.ONE_V_ONE ->
+                Stepper("Laps", s.sprintLaps, 1..40, suffix = " (${s.sprintLaps * 250} m)") { v ->
+                    vm.update { it.copy(sprintLaps = v) }
+                }
+            RaceType.POINTS_RACE -> {
+                Stepper("Laps", s.pointsLaps, 4..160, step = 2, suffix = " (${s.pointsLaps * 250 / 1000.0} km)") { v ->
+                    vm.update { it.copy(pointsLaps = v) }
+                }
+                Stepper("Sprint every", s.sprintEveryLaps, 2..20, suffix = " laps") { v ->
+                    vm.update { it.copy(sprintEveryLaps = v) }
+                }
             }
-        } else {
-            Stepper("Laps", s.omniumLaps, 4..160, step = 2, suffix = " (${s.omniumLaps * 250 / 1000.0} km)") { v ->
-                vm.update { it.copy(omniumLaps = v) }
+            RaceType.MADISON -> {
+                Stepper("Laps", s.madisonLaps, 10..200, step = 10, suffix = " (${s.madisonLaps * 250 / 1000.0} km)") { v ->
+                    vm.update { it.copy(madisonLaps = v) }
+                }
+                Stepper("Sprint every", s.sprintEveryLaps, 2..20, suffix = " laps") { v ->
+                    vm.update { it.copy(sprintEveryLaps = v) }
+                }
+                Stepper("Swap every (½ laps)", s.madisonChangeHalfLaps, 1..8, suffix = " → ${s.madisonChangeHalfLaps / 2.0} laps") { v ->
+                    vm.update { it.copy(madisonChangeHalfLaps = v) }
+                }
+                Text(
+                    "On your partner's turn, ease off and recover. The hand-sling gives the incoming rider a push.",
+                    fontSize = 12.sp,
+                    color = Palette.muted,
+                )
+                LabeledSlider("Partner strength", s.partnerStrengthPct, 50..150, "% of your FTP") { v ->
+                    vm.update { it.copy(partnerStrengthPct = v) }
+                }
             }
-            Stepper("Sprint every", s.sprintEveryLaps, 2..20, suffix = " laps") { v ->
-                vm.update { it.copy(sprintEveryLaps = v) }
+            RaceType.INDIVIDUAL_PURSUIT -> {
+                Text("Distance", fontWeight = FontWeight.Bold)
+                listOf(8 to "2 km (junior women)", 12 to "3 km (women / junior men)", 16 to "4 km (elite men)").forEach { (laps, label) ->
+                    RadioRow(label, "$laps laps", s.pursuitLaps == laps) { vm.update { it.copy(pursuitLaps = laps) } }
+                }
+            }
+            RaceType.OMNIUM -> {
+                RadioRow(
+                    "Club length",
+                    "Scratch 5 km · Tempo 5 km · Elimination · Points race 10 km",
+                    !s.omniumFull,
+                ) { vm.update { it.copy(omniumFull = false) } }
+                RadioRow(
+                    "Full length",
+                    "Scratch 10 km · Tempo 10 km · Elimination · Points race 20 km",
+                    s.omniumFull,
+                ) { vm.update { it.copy(omniumFull = true) } }
+                Stepper("Points race sprint every", s.sprintEveryLaps, 2..20, suffix = " laps") { v ->
+                    vm.update { it.copy(sprintEveryLaps = v) }
+                }
+                Text(
+                    "With a single ghost the elimination is decided at the first elimination sprint (2 laps).",
+                    fontSize = 12.sp,
+                    color = Palette.muted,
+                )
             }
         }
     }
@@ -307,18 +347,21 @@ private fun GhostCard(vm: RaceViewModel, s: AppSettings) {
         LabeledSlider("Ghost strength", s.ghostStrengthPct, 50..150, "%  (ghost FTP $ghostFtp W)") { v ->
             vm.update { it.copy(ghostStrengthPct = v) }
         }
-        SwitchRow(
+        val pursuit = s.raceType == RaceType.INDIVIDUAL_PURSUIT
+        if (!pursuit) SwitchRow(
             "Ghost attacks the sprints",
             "Ghost kicks for the line in the last 200 m before every sprint / the finish",
             s.ghostAttacks,
         ) { on -> vm.update { it.copy(ghostAttacks = on) } }
-        if (s.ghostAttacks) {
+        if (s.ghostAttacks && !pursuit) {
             LabeledSlider("Ghost sprint power", s.ghostSprintPct, 110..300, "% FTP  (${ghostFtp * s.ghostSprintPct / 100} W)") { v ->
                 vm.update { it.copy(ghostSprintPct = v) }
             }
         }
-        Stepper("Ghost head start", s.ghostHeadStartM, -100..100, step = 5, suffix = " m") { v ->
-            vm.update { it.copy(ghostHeadStartM = v) }
+        if (!pursuit) {
+            Stepper("Ghost head start", s.ghostHeadStartM, -100..100, step = 5, suffix = " m") { v ->
+                vm.update { it.copy(ghostHeadStartM = v) }
+            }
         }
     }
 }

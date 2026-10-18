@@ -1,6 +1,7 @@
 package com.velodromeghost.app.data
 
 import android.content.Context
+import com.velodromeghost.core.race.Omnium
 import com.velodromeghost.core.race.RaceMode
 
 enum class ResistanceMode(val label: String, val help: String) {
@@ -9,14 +10,40 @@ enum class ResistanceMode(val label: String, val help: String) {
     OFF("No control", "Leave the resistance knob to you."),
 }
 
+enum class RaceType(val label: String, val help: String) {
+    ONE_V_ONE("1 v 1 race", "Head to head against the ghost. First across the line wins."),
+    POINTS_RACE(
+        "Points race",
+        "Sprint every few laps for 5 / 3 points, double points at the finish, +20 for lapping the ghost. Most points wins.",
+    ),
+    MADISON(
+        "Madison",
+        "Two-rider relay: you and a virtual partner take turns, swapping with a hand-sling every few laps. Points-race scoring against the ghost team.",
+    ),
+    INDIVIDUAL_PURSUIT(
+        "Individual pursuit",
+        "You and the ghost start on opposite sides of the track. Fastest time wins, or catch the ghost to win outright.",
+    ),
+    OMNIUM(
+        "Omnium",
+        "Four races in one session: scratch, tempo, elimination and points race. 40 / 38 points per race, points-race points added on top.",
+    ),
+}
+
 data class AppSettings(
     val ftpWatts: Int = 200,
     val riderWeightKg: Int = 75,
     val bikeWeightKg: Int = 8,
-    val mode: RaceMode = RaceMode.SPRINT_1V1,
+    val raceType: RaceType = RaceType.ONE_V_ONE,
     val sprintLaps: Int = 3,
-    val omniumLaps: Int = 40,
+    val pointsLaps: Int = 40,
     val sprintEveryLaps: Int = 10,
+    val madisonLaps: Int = 60,
+    /** Laps per Madison turn, in half laps (4 = 2 laps). */
+    val madisonChangeHalfLaps: Int = 4,
+    val partnerStrengthPct: Int = 100,
+    val pursuitLaps: Int = 16,
+    val omniumFull: Boolean = false,
     val ghostStrengthPct: Int = 100,
     val constantPacePct: Int = 85,
     val ghostAttacks: Boolean = true,
@@ -31,7 +58,14 @@ data class AppSettings(
     val lastDeviceAddress: String? = null,
     val lastDeviceName: String? = null,
 ) {
-    val laps: Int get() = if (mode == RaceMode.SPRINT_1V1) sprintLaps else omniumLaps
+    /** The race(s) to ride, in order (more than one for the omnium). */
+    fun events(): List<Omnium.Event> = when (raceType) {
+        RaceType.ONE_V_ONE -> listOf(Omnium.Event(RaceMode.SPRINT_1V1, sprintLaps))
+        RaceType.POINTS_RACE -> listOf(Omnium.Event(RaceMode.POINTS_RACE, pointsLaps))
+        RaceType.MADISON -> listOf(Omnium.Event(RaceMode.MADISON, madisonLaps))
+        RaceType.INDIVIDUAL_PURSUIT -> listOf(Omnium.Event(RaceMode.INDIVIDUAL_PURSUIT, pursuitLaps))
+        RaceType.OMNIUM -> Omnium.events(omniumFull)
+    }
 }
 
 class SettingsStore(context: Context) {
@@ -43,9 +77,16 @@ class SettingsStore(context: Context) {
             ftpWatts = prefs.getInt("ftp", d.ftpWatts),
             riderWeightKg = prefs.getInt("riderKg", d.riderWeightKg),
             bikeWeightKg = prefs.getInt("bikeKg", d.bikeWeightKg),
-            mode = enumOr(prefs.getString("mode", null), d.mode),
+            // Older versions stored "mode"; their sprint race "omnium" is what's now called the points race.
+            raceType = enumOrNull<RaceType>(prefs.getString("raceType", null))
+                ?: if (prefs.getString("mode", null) == "OMNIUM_POINTS") RaceType.POINTS_RACE else d.raceType,
             sprintLaps = prefs.getInt("sprintLaps", d.sprintLaps),
-            omniumLaps = prefs.getInt("omniumLaps", d.omniumLaps),
+            pointsLaps = prefs.getInt("pointsLaps", prefs.getInt("omniumLaps", d.pointsLaps)),
+            madisonLaps = prefs.getInt("madisonLaps", d.madisonLaps),
+            madisonChangeHalfLaps = prefs.getInt("madisonChange", d.madisonChangeHalfLaps),
+            partnerStrengthPct = prefs.getInt("partnerStrength", d.partnerStrengthPct),
+            pursuitLaps = prefs.getInt("pursuitLaps", d.pursuitLaps),
+            omniumFull = prefs.getBoolean("omniumFull", d.omniumFull),
             sprintEveryLaps = prefs.getInt("sprintEvery", d.sprintEveryLaps),
             ghostStrengthPct = prefs.getInt("ghostStrength", d.ghostStrengthPct),
             constantPacePct = prefs.getInt("constantPace", d.constantPacePct),
@@ -66,9 +107,14 @@ class SettingsStore(context: Context) {
             .putInt("ftp", s.ftpWatts)
             .putInt("riderKg", s.riderWeightKg)
             .putInt("bikeKg", s.bikeWeightKg)
-            .putString("mode", s.mode.name)
+            .putString("raceType", s.raceType.name)
             .putInt("sprintLaps", s.sprintLaps)
-            .putInt("omniumLaps", s.omniumLaps)
+            .putInt("pointsLaps", s.pointsLaps)
+            .putInt("madisonLaps", s.madisonLaps)
+            .putInt("madisonChange", s.madisonChangeHalfLaps)
+            .putInt("partnerStrength", s.partnerStrengthPct)
+            .putInt("pursuitLaps", s.pursuitLaps)
+            .putBoolean("omniumFull", s.omniumFull)
             .putInt("sprintEvery", s.sprintEveryLaps)
             .putInt("ghostStrength", s.ghostStrengthPct)
             .putInt("constantPace", s.constantPacePct)
@@ -85,5 +131,8 @@ class SettingsStore(context: Context) {
     }
 
     private inline fun <reified T : Enum<T>> enumOr(name: String?, default: T): T =
-        name?.let { n -> enumValues<T>().firstOrNull { it.name == n } } ?: default
+        enumOrNull<T>(name) ?: default
+
+    private inline fun <reified T : Enum<T>> enumOrNull(name: String?): T? =
+        name?.let { n -> enumValues<T>().firstOrNull { it.name == n } }
 }

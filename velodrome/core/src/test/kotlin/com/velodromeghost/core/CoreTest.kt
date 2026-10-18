@@ -153,7 +153,7 @@ class RaceEngineTest {
 
     @Test
     fun omniumAwardsSprintPoints() {
-        val cfg = RaceConfig(mode = RaceMode.OMNIUM_POINTS, laps = 12, sprintEveryLaps = 4, riderFtpWatts = 200.0)
+        val cfg = RaceConfig(mode = RaceMode.POINTS_RACE, laps = 12, sprintEveryLaps = 4, riderFtpWatts = 200.0)
         val s = run(RaceEngine(cfg), 400.0)
         assertEquals(3, s.sprints.size)
         assertTrue(s.sprints.last().isFinal)

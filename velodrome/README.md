@@ -9,7 +9,10 @@ A simple Android app for racing a pace-setting **ghost rider** round a 250 m vel
   - Landscape (Peloton tablet, phone on its side) puts the views side by side. Portrait stacks them.
 - **Race types**
   - **1 v 1 race:** first across the line wins. 3 laps (a match sprint) by default, 1–40 laps.
-  - **Omnium points race:** a long, paced race with a sprint every *N* laps. Each sprint pays 5 pts to the winner and 3 to second. The finish counts double (10 / 6), and lapping the ghost is worth +20.
+  - **Points race:** a sprint every *N* laps pays 5 points to the winner and 3 to second, the finish counts double (10 / 6), and lapping the ghost is worth +20. Most points wins.
+  - **Madison:** a points race ridden as a two-rider relay. You and a virtual partner take turns, swapping with a hand-sling every ½–4 laps (the incoming rider gets a push). On your partner's turn, ease off and recover (ERG drops to 50 % FTP). The screen shows whose turn it is and the metres to the next sling. Your partner's strength is adjustable.
+  - **Individual pursuit:** you and the ghost start on opposite sides of the track (125 m apart) over 2, 3 or 4 km. Best time wins, or catch the ghost to win on the spot. There's no drafting, and the gap is shown in seconds.
+  - **Omnium:** four races in one session: *scratch* (first across the line), *tempo* (1 point for winning each lap from lap 5, +20 for a lap gain), *elimination*, and a final *points race*. The first three pay 40 points to the winner and 38 to second, and points-race points are added on top. Club or full length. With only one ghost, the elimination is decided at the first elimination sprint after 2 laps.
 - **Ghost pacing**
   - Constant pace (% of the ghost's FTP), **or**
   - any **Zwift `.zwo` workout**: four track-style ones are built in, and **Import .zwo file…** adds your own.
@@ -99,7 +102,7 @@ The workouts are timed in seconds, but sprints happen at fixed laps. For an omni
 `.zwo` for the tempo in between.
 
 Built-in workouts (`app/src/main/assets/workouts/`): *Match Sprint – Cat and Mouse*, *Omnium Points
-Race – 40 laps*, *Kilo Time Trial – 4 laps*, *Tempo Race – Surges*. They're also good templates for
+Race – 40 laps*, *Kilo Time Trial – 4 laps*, *Tempo Race – Surges*, *Individual Pursuit – 4 km*. They're also good templates for
 writing your own.
 
 ## Send to ChatGPT

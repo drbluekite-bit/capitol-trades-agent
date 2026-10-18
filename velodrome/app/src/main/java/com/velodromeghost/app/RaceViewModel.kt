@@ -18,6 +18,7 @@ import com.velodromeghost.core.fit.RideSummary
 import com.velodromeghost.core.physics.Physics
 import com.velodromeghost.core.physics.RiderParams
 import com.velodromeghost.core.race.Competitor
+import com.velodromeghost.core.race.Omnium
 import com.velodromeghost.core.race.RaceConfig
 import com.velodromeghost.core.race.RaceMode
 import com.velodromeghost.core.race.RaceEngine
@@ -43,6 +44,19 @@ import java.util.TimeZone
 import kotlin.math.roundToInt
 
 enum class Screen { SETUP, RACE, RESULTS }
+
+/** The race(s) being ridden: one event, or the four omnium events in order. */
+data class RaceSession(
+    val events: List<Omnium.Event>,
+    val index: Int = 0,
+    val results: List<Omnium.EventResult> = emptyList(),
+) {
+    val isOmnium: Boolean get() = events.size > 1
+    val current: Omnium.Event get() = events[index]
+    val isLastEvent: Boolean get() = index == events.lastIndex
+    val hasNext: Boolean get() = !isLastEvent && results.size > index && results[index].finished
+    val isComplete: Boolean get() = results.size == events.size && results.all { it.finished }
+}
 
 class RaceViewModel(app: Application) : AndroidViewModel(app) {
     val ble = BleManager(app)
@@ -84,6 +98,9 @@ class RaceViewModel(app: Application) : AndroidViewModel(app) {
     /** Set when a race finishes and the ride should be sent to ChatGPT automatically. */
     private val _autoSendPending = MutableStateFlow(false)
     val autoSendPending: StateFlow<Boolean> = _autoSendPending.asStateFlow()
+
+    private val _session = MutableStateFlow<RaceSession?>(null)
+    val session: StateFlow<RaceSession?> = _session.asStateFlow()
 
     private var engine: RaceEngine? = null
     private var loop: Job? = null
@@ -146,8 +163,26 @@ class RaceViewModel(app: Application) : AndroidViewModel(app) {
 
     // ------------------------------------------------------------------ race
 
+    /** Starts a new race (or a whole new omnium) from the current setup. */
     fun startRace() {
         val s = _settings.value
+        val session = RaceSession(s.events())
+        _session.value = session
+        startEvent(session)
+    }
+
+    /** Omnium: on to the next event. */
+    fun nextEvent() {
+        val current = _session.value ?: return
+        if (!current.hasNext) return
+        val next = current.copy(index = current.index + 1)
+        _session.value = next
+        startEvent(next)
+    }
+
+    private fun startEvent(session: RaceSession) {
+        val s = _settings.value
+        val event = session.current
         viewModelScope.launch {
             val workout = s.workoutId?.let { id ->
                 try {
@@ -160,8 +195,8 @@ class RaceViewModel(app: Application) : AndroidViewModel(app) {
             activeWorkout = workout
             val mass = (s.riderWeightKg + s.bikeWeightKg).toDouble()
             val config = RaceConfig(
-                mode = s.mode,
-                laps = s.laps,
+                mode = event.mode,
+                laps = event.laps,
                 sprintEveryLaps = s.sprintEveryLaps,
                 riderFtpWatts = s.ftpWatts.toDouble(),
                 riderMassKg = mass,
@@ -172,6 +207,8 @@ class RaceViewModel(app: Application) : AndroidViewModel(app) {
                 ghostAttacksSprints = s.ghostAttacks,
                 ghostSprintFraction = s.ghostSprintPct / 100.0,
                 ghostHeadStartMeters = s.ghostHeadStartM.toDouble(),
+                madisonChangeLaps = s.madisonChangeHalfLaps / 2.0,
+                partnerStrength = s.partnerStrengthPct / 100.0,
             )
             track = config.track
             val newEngine = RaceEngine(config)
@@ -227,7 +264,11 @@ class RaceViewModel(app: Application) : AndroidViewModel(app) {
                     if (finishedAt == 0L) {
                         finishedAt = now
                         releaseResistance(s)
-                        if (s.autoSendToChatGpt && !s.demoMode && !recorder.isEmpty) _autoSendPending.value = true
+                        recordResult(state)
+                        val sessionDone = _session.value?.isLastEvent != false
+                        if (s.autoSendToChatGpt && !s.demoMode && !recorder.isEmpty && sessionDone) {
+                            _autoSendPending.value = true
+                        }
                     } else if (now - finishedAt > 3_500_000_000L) {
                         _screen.value = Screen.RESULTS
                         break
@@ -300,7 +341,11 @@ class RaceViewModel(app: Application) : AndroidViewModel(app) {
             appendLine()
             appendLine("Date: " + SimpleDateFormat("EEE d MMM yyyy, HH:mm", Locale.UK).format(Date(start)))
             if (st != null) {
-                val type = if (st.mode == RaceMode.SPRINT_1V1) "1v1 race" else "Omnium points race (sprint every ${s.sprintEveryLaps} laps)"
+                val type = when (st.mode) {
+                    RaceMode.POINTS_RACE -> "Points race (sprint every ${s.sprintEveryLaps} laps)"
+                    RaceMode.MADISON -> "Madison (sprint every ${s.sprintEveryLaps} laps, swapping with a virtual partner every ${s.madisonChangeHalfLaps / 2.0} laps)"
+                    else -> st.mode.label
+                }
                 appendLine("Race: $type, ${st.totalLaps} laps (${st.raceDistanceMeters.roundToInt()} m)")
                 val result = when {
                     st.phase != RacePhase.FINISHED -> "abandoned"
@@ -308,8 +353,17 @@ class RaceViewModel(app: Application) : AndroidViewModel(app) {
                     else -> "the ghost won" + (st.marginSeconds?.let { " by %.2f s".format(Locale.UK, it) } ?: "")
                 }
                 appendLine("Result: $result")
-                if (st.mode == RaceMode.OMNIUM_POINTS) {
+                if (st.caughtBy != null) {
+                    appendLine(if (st.caughtBy == Competitor.RIDER) "I caught the ghost." else "The ghost caught me.")
+                }
+                if (st.mode.isPointsBased) {
                     appendLine("Points: me ${st.riderTotalPoints}, ghost ${st.ghostTotalPoints} (sprints won ${st.sprints.count { it.winner == Competitor.RIDER }}/${st.sprints.size})")
+                }
+            }
+            _session.value?.takeIf { it.isOmnium }?.let { session ->
+                appendLine("Omnium: event ${session.index + 1} of ${session.events.size}. Standings: me ${Omnium.riderTotal(session.results)}, ghost ${Omnium.ghostTotal(session.results)}")
+                session.results.forEach { r ->
+                    appendLine("  - ${r.mode.label}: me ${r.riderPoints}, ghost ${r.ghostPoints}")
                 }
             }
             appendLine("Ghost: ${s.ghostStrengthPct}% of my FTP, pacing: ${activeWorkout?.name ?: "constant ${s.constantPacePct}% FTP"}")
@@ -369,6 +423,13 @@ class RaceViewModel(app: Application) : AndroidViewModel(app) {
         if (s.resistance != ResistanceMode.OFF) ble.setSimulation(0.0, SIM_CRR, simCw(false) / 100.0)
     }
 
+    /** Stores this event's result in the session (once). */
+    private fun recordResult(state: RaceState) {
+        val session = _session.value ?: return
+        if (session.results.size > session.index) return
+        _session.value = session.copy(results = session.results + Omnium.score(state))
+    }
+
     fun togglePause() {
         _paused.update { !it }
     }
@@ -379,6 +440,7 @@ class RaceViewModel(app: Application) : AndroidViewModel(app) {
         releaseResistance(_settings.value)
         val st = _race.value
         val finished = st != null && st.phase == RacePhase.FINISHED
+        if (st != null) recordResult(st)
         if (!recorder.isEmpty) _ride.value = recorder.summary()
         // Even an abandoned race can be exported if you rode some of it.
         _screen.value = if (finished || !recorder.isEmpty) Screen.RESULTS else Screen.SETUP
