@@ -68,20 +68,29 @@ object OverviewRenderer {
         drawText(text, "FINISH", topLeft = Offset(f.x - 18f, f.y), style = small)
 
         val dot = max(7f, 1.3f * scale)
-        val ghost = screen(track.position(state.ghost.distance, 2.6))
-        val me = screen(track.position(state.rider.distance, 1.0))
-        drawCircle(Palette.ghost.copy(alpha = 0.25f), radius = dot * 2.2f, center = ghost)
-        drawCircle(Palette.ghost, radius = dot, center = ghost)
-        drawCircle(Color.White, radius = dot * 1.25f, center = me)
-        drawCircle(Palette.rider, radius = dot, center = me)
-
         val label = TextStyle(fontSize = 12.sp, fontWeight = FontWeight.Bold)
         val toCentre = { p: Offset -> Offset((cx - p.x) * 0.12f, (cy - p.y) * 0.12f) }
-        drawText(text, "GHOST", topLeft = ghost + toCentre(ghost) + Offset(-18f, -dot * 3.2f), style = label.copy(color = Palette.ghost))
+        val me = screen(track.position(state.rider.distance, 1.0))
+
+        val field = state.isField
+        state.ghosts.filter { !it.eliminated }.forEach { g ->
+            val color = Palette.competitor(g.id, state.fieldSize)
+            val lateral = if (field) 1.6 + ((g.id * 1.37) % 4.2) else 2.6
+            val p = screen(track.position(g.rider.distance, lateral))
+            val r = if (field) dot * 0.8f else dot
+            drawCircle(color.copy(alpha = 0.25f), radius = r * 2f, center = p)
+            drawCircle(color, radius = r, center = p)
+            if (!field) {
+                drawText(text, "GHOST", topLeft = p + toCentre(p) + Offset(-18f, -dot * 3.2f), style = label.copy(color = color))
+            }
+        }
+        drawCircle(Color.White, radius = dot * 1.25f, center = me)
+        drawCircle(Palette.rider, radius = dot, center = me)
         drawText(text, "YOU", topLeft = me + toCentre(me) + Offset(-12f, dot * 1.2f), style = label.copy(color = Palette.rider))
 
-        // A short line linking the two riders when close, to read the gap at a glance.
-        if (kotlin.math.abs(track.wrappedDelta(state.rider.distance, state.ghost.distance)) < 30) {
+        // A short line linking you to a lone ghost when close, to read the gap at a glance.
+        if (!field && kotlin.math.abs(track.wrappedDelta(state.rider.distance, state.ghost.distance)) < 30) {
+            val ghost = screen(track.position(state.ghost.distance, 2.6))
             drawLine(Color.White.copy(alpha = 0.4f), me, ghost, strokeWidth = 2f, cap = StrokeCap.Round)
         }
     }

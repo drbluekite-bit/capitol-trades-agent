@@ -209,6 +209,10 @@ class RaceViewModel(app: Application) : AndroidViewModel(app) {
                 ghostHeadStartMeters = s.ghostHeadStartM.toDouble(),
                 madisonChangeLaps = s.madisonChangeHalfLaps / 2.0,
                 partnerStrength = s.partnerStrengthPct / 100.0,
+                fieldSize = if (s.hasField) s.fieldSize else 1,
+                fieldMinLevel = s.fieldMinPct / 100.0,
+                fieldMaxLevel = s.fieldMaxPct / 100.0,
+                seed = System.nanoTime(),
             )
             track = config.track
             val newEngine = RaceEngine(config)
@@ -350,9 +354,14 @@ class RaceViewModel(app: Application) : AndroidViewModel(app) {
                 val result = when {
                     st.phase != RacePhase.FINISHED -> "abandoned"
                     st.winner == Competitor.RIDER -> "I won" + (st.marginSeconds?.let { " by %.2f s".format(Locale.UK, it) } ?: "")
+                    st.isField -> "${st.standings.first().name} won, I was ${st.riderPlace} of ${st.standings.size}"
                     else -> "the ghost won" + (st.marginSeconds?.let { " by %.2f s".format(Locale.UK, it) } ?: "")
                 }
                 appendLine("Result: $result")
+                if (st.isField) {
+                    appendLine("Field: ${st.fieldSize} ghost riders, each riding at a random ${s.fieldMinPct}-${s.fieldMaxPct}% of my FTP that changed through the race. I placed ${st.riderPlace} of ${st.standings.size}.")
+                    appendLine("Final classification: " + st.standings.joinToString { "${it.place}. ${it.name}" + if (st.mode.isPointsBased) " (${it.points} pts)" else "" })
+                }
                 if (st.caughtBy != null) {
                     appendLine(if (st.caughtBy == Competitor.RIDER) "I caught the ghost." else "The ghost caught me.")
                 }
@@ -363,8 +372,9 @@ class RaceViewModel(app: Application) : AndroidViewModel(app) {
             _session.value?.takeIf { it.isOmnium }?.let { session ->
                 appendLine("Omnium: event ${session.index + 1} of ${session.events.size}. Standings: me ${Omnium.riderTotal(session.results)}, ghost ${Omnium.ghostTotal(session.results)}")
                 session.results.forEach { r ->
-                    appendLine("  - ${r.mode.label}: me ${r.riderPoints}, ghost ${r.ghostPoints}")
+                    appendLine("  - ${r.mode.label}: I placed ${r.riderPlace ?: "-"} for ${r.riderPoints} pts (best ghost ${r.ghostPoints})")
                 }
+                appendLine("  Omnium place so far: ${Omnium.riderPlace(session.results)} of ${Omnium.standings(session.results).size}")
             }
             appendLine("Ghost: ${s.ghostStrengthPct}% of my FTP, pacing: ${activeWorkout?.name ?: "constant ${s.constantPacePct}% FTP"}")
             appendLine()

@@ -140,6 +140,7 @@ fun ResultsScreen(vm: RaceViewModel) {
                     when {
                         !finished -> "Race abandoned"
                         youWon -> "YOU WIN!"
+                        st.isField -> "${st.standings.first().name.uppercase()} WINS"
                         else -> "THE GHOST WINS"
                     },
                     fontSize = 40.sp,
@@ -153,10 +154,13 @@ fun ResultsScreen(vm: RaceViewModel) {
                         Text("by %.2f s".format(it), fontSize = 22.sp, color = Color.White)
                     }
                 }
+                if (st.isField) {
+                    Text("You placed ${st.riderPlace} of ${st.standings.size}", fontSize = 22.sp, color = Color.White)
+                }
                 HorizontalDivider()
                 Line("Distance", "%.0f m (%d laps)".format(st.raceDistanceMeters, st.totalLaps))
                 st.rider.finishTimeSec?.let { Line("Your time", formatTime(it)) }
-                Line(
+                if (!st.isField) Line(
                     "Ghost time",
                     st.ghost.finishTimeSec?.let(::formatTime) ?: if (st.caughtBy != null) "caught" else "still racing",
                 )
@@ -174,13 +178,35 @@ fun ResultsScreen(vm: RaceViewModel) {
                                 sprint.isFinal -> "Final sprint (x2) · lap ${sprint.lap}"
                                 else -> "Sprint ${sprint.number} · lap ${sprint.lap}"
                             },
-                            (if (sprint.winner == Competitor.RIDER) "You" else "Ghost") +
-                                "   (you ${sprint.riderPoints} / ghost ${sprint.ghostPoints})",
+                            if (st.isField) {
+                                sprint.winnerName + (sprint.riderPlace?.let { "   (you ${ordinalOf(it)}, +${sprint.riderPoints})" } ?: "")
+                            } else {
+                                (if (sprint.winner == Competitor.RIDER) "You" else "Ghost") +
+                                    "   (you ${sprint.riderPoints} / ghost ${sprint.ghostPoints})"
+                            },
                         )
                     }
-                    if (st.riderLapPoints > 0) Line("Laps gained", "+${st.riderLapPoints} you")
-                    if (st.ghostLapPoints > 0) Line("Laps gained", "+${st.ghostLapPoints} ghost")
-                    Line("TOTAL", "You ${st.riderTotalPoints}  ·  Ghost ${st.ghostTotalPoints}", bold = true)
+                    if (st.riderLapPoints != 0) Line("Your laps gained / lost", "%+d".format(st.riderLapPoints))
+                    if (!st.isField) {
+                        if (st.ghostLapPoints > 0) Line("Laps gained", "+${st.ghostLapPoints} ghost")
+                        Line("TOTAL", "You ${st.riderTotalPoints}  ·  Ghost ${st.ghostTotalPoints}", bold = true)
+                    }
+                }
+                if (st.isField) {
+                    HorizontalDivider()
+                    Text("Classification", fontWeight = FontWeight.Bold, color = Palette.accent, fontSize = 20.sp)
+                    st.standings.forEach { row ->
+                        Line(
+                            "${row.place}. ${row.name}",
+                            when {
+                                st.mode.isPointsBased -> "${row.points} pts"
+                                st.mode == RaceMode.ELIMINATION && row.eliminated -> "eliminated"
+                                else -> row.finishTimeSec?.let(::formatTime) ?: "%.0f m".format(row.distance)
+                            },
+                            bold = row.isYou,
+                            color = Palette.competitor(row.id, st.fieldSize),
+                        )
+                    }
                 }
             }
             session?.takeIf { it.isOmnium }?.let { OmniumStandings(it) }
@@ -233,20 +259,37 @@ private fun OmniumStandings(session: RaceSession) {
             when {
                 r == null -> "to come"
                 !r.finished -> "abandoned"
-                else -> "you ${r.riderPoints} · ghost ${r.ghostPoints}"
+                else -> "you ${r.riderPlace?.let { ordinalOf(it) } ?: "-"} · ${r.riderPoints} pts"
             },
         )
     }
-    Line("TOTAL", "You ${Omnium.riderTotal(session.results)}  ·  Ghost ${Omnium.ghostTotal(session.results)}", bold = true)
+    val standings = Omnium.standings(session.results)
+    val names = Omnium.names(session.results)
+    val fieldSize = names.size - 1
+    Text("Standings", fontWeight = FontWeight.Bold, color = Palette.accent)
+    standings.forEachIndexed { i, (id, total) ->
+        Line("${i + 1}. ${names[id] ?: "?"}", "$total pts", bold = id == 0, color = Palette.competitor(id, fieldSize))
+    }
     if (done) {
         val winner = Omnium.overallWinner(session.results)
         Text(
-            if (winner == Competitor.RIDER) "You win the omnium!" else "The ghost wins the omnium",
+            if (winner == Competitor.RIDER) "You win the omnium!"
+            else "${names[standings.first().first] ?: "The ghost"} wins the omnium - you're ${ordinalOf(Omnium.riderPlace(session.results))}",
             fontSize = 26.sp,
             fontWeight = FontWeight.Black,
             color = if (winner == Competitor.RIDER) Palette.good else Palette.ghost,
         )
     }
+}
+
+private fun ordinalOf(n: Int): String {
+    val suffix = if (n % 100 in 11..13) "th" else when (n % 10) {
+        1 -> "st"
+        2 -> "nd"
+        3 -> "rd"
+        else -> "th"
+    }
+    return "$n$suffix"
 }
 
 private const val CHATGPT_PACKAGE = "com.openai.chatgpt"
@@ -265,9 +308,9 @@ private fun RideStats(r: RideSummary) {
 }
 
 @Composable
-private fun Line(label: String, value: String, bold: Boolean = false) {
+private fun Line(label: String, value: String, bold: Boolean = false, color: Color = Palette.muted) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text(label, color = Palette.muted, modifier = Modifier.weight(1f))
+        Text(label, color = color, modifier = Modifier.weight(1f), fontWeight = if (bold) FontWeight.Black else FontWeight.Normal)
         Text(value, color = Color.White, fontWeight = if (bold) FontWeight.Black else FontWeight.SemiBold)
     }
 }

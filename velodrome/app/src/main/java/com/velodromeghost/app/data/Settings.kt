@@ -44,6 +44,10 @@ data class AppSettings(
     val partnerStrengthPct: Int = 100,
     val pursuitLaps: Int = 16,
     val omniumFull: Boolean = false,
+    /** Ghost riders in bunch races (points race, Madison, omnium). */
+    val fieldSize: Int = 6,
+    val fieldMinPct: Int = 60,
+    val fieldMaxPct: Int = 125,
     val ghostStrengthPct: Int = 100,
     val constantPacePct: Int = 85,
     val ghostAttacks: Boolean = true,
@@ -58,6 +62,9 @@ data class AppSettings(
     val lastDeviceAddress: String? = null,
     val lastDeviceName: String? = null,
 ) {
+    /** Bunch races where a whole field can ride. */
+    val hasField: Boolean get() = raceType == RaceType.POINTS_RACE || raceType == RaceType.MADISON || raceType == RaceType.OMNIUM
+
     /** The race(s) to ride, in order (more than one for the omnium). */
     fun events(): List<Omnium.Event> = when (raceType) {
         RaceType.ONE_V_ONE -> listOf(Omnium.Event(RaceMode.SPRINT_1V1, sprintLaps))
@@ -87,6 +94,9 @@ class SettingsStore(context: Context) {
             partnerStrengthPct = prefs.getInt("partnerStrength", d.partnerStrengthPct),
             pursuitLaps = prefs.getInt("pursuitLaps", d.pursuitLaps),
             omniumFull = prefs.getBoolean("omniumFull", d.omniumFull),
+            fieldSize = prefs.getInt("fieldSize", d.fieldSize),
+            fieldMinPct = prefs.getInt("fieldMin", d.fieldMinPct),
+            fieldMaxPct = prefs.getInt("fieldMax", d.fieldMaxPct),
             sprintEveryLaps = prefs.getInt("sprintEvery", d.sprintEveryLaps),
             ghostStrengthPct = prefs.getInt("ghostStrength", d.ghostStrengthPct),
             constantPacePct = prefs.getInt("constantPace", d.constantPacePct),
@@ -115,6 +125,9 @@ class SettingsStore(context: Context) {
             .putInt("partnerStrength", s.partnerStrengthPct)
             .putInt("pursuitLaps", s.pursuitLaps)
             .putBoolean("omniumFull", s.omniumFull)
+            .putInt("fieldSize", s.fieldSize)
+            .putInt("fieldMin", s.fieldMinPct)
+            .putInt("fieldMax", s.fieldMaxPct)
             .putInt("sprintEvery", s.sprintEveryLaps)
             .putInt("ghostStrength", s.ghostStrengthPct)
             .putInt("constantPace", s.constantPacePct)

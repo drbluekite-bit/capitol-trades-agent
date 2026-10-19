@@ -13,6 +13,16 @@ A simple Android app for racing a pace-setting **ghost rider** round a 250 m vel
   - **Madison:** a points race ridden as a two-rider relay. You and a virtual partner take turns, swapping with a hand-sling every ½–4 laps (the incoming rider gets a push). On your partner's turn, ease off and recover (ERG drops to 50 % FTP). The screen shows whose turn it is and the metres to the next sling. Your partner's strength is adjustable.
   - **Individual pursuit:** you and the ghost start on opposite sides of the track (125 m apart) over 2, 3 or 4 km. Best time wins, or catch the ghost to win on the spot. There's no drafting, and the gap is shown in seconds.
   - **Omnium:** four races in one session: *scratch* (first across the line), *tempo* (1 point for winning each lap from lap 5, +20 for a lap gain), *elimination*, and a final *points race*. The first three pay 40 points to the winner and 38 to second, and points-race points are added on top. Club or full length. With only one ghost, the elimination is decided at the first elimination sprint after 2 laps.
+- **Race against a field.** In the points race, Madison and omnium you can race up to 11 ghosts.
+  Each one rides at a power that wanders randomly within a range you set (default **60–125 % of
+  your FTP**), changing every 20–75 s, so riders surge and fade through the race.
+  - Each ghost has its own colour and name (Cyan, Lime, Pink…) and its own sprint, and they don't all contest every sprint.
+  - Sprints pay 5 / 3 / 2 / 1 to the first four (double at the finish).
+  - Lap gains and losses count against the rest of the field.
+  - The elimination becomes a real elimination: the last rider over the line every 2 laps is out until one is left.
+  - The race screen shows the nearest rival, your place on the road and a live classification.
+  - The omnium scores 40 / 38 / 36… by place, and keeps a running table for the whole field.
+  - Set the field to 1 for head-to-head racing; the 1 v 1 and pursuit are always head to head.
 - **Ghost pacing**
   - Constant pace (% of the ghost's FTP), **or**
   - any **Zwift `.zwo` workout**: four track-style ones are built in, and **Import .zwo file…** adds your own.

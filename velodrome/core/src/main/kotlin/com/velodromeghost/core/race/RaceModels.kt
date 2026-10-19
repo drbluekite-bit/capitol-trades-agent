@@ -27,6 +27,22 @@ enum class RaceMode(val label: String) {
 
     val isPointsBased: Boolean get() = this == TEMPO || this == POINTS_RACE || this == MADISON
     val isPursuit: Boolean get() = this == INDIVIDUAL_PURSUIT
+
+    /** Bunch races that can be ridden against a whole field of ghosts. */
+    val supportsField: Boolean get() = this != SPRINT_1V1 && this != INDIVIDUAL_PURSUIT
+}
+
+/** Names (and, in the app, colours) for the ghosts in a field. */
+object Field {
+    const val MAX_GHOSTS = 11
+    private val NAMES = listOf("Cyan", "Lime", "Pink", "Amber", "Violet", "Coral", "Teal", "Gold", "Sky", "Mint", "Rose")
+
+    /** Competitor 0 is you; ghosts are 1..N. */
+    fun name(id: Int, fieldSize: Int): String = when {
+        id == 0 -> "You"
+        fieldSize <= 1 -> "Ghost"
+        else -> NAMES[(id - 1) % NAMES.size]
+    }
 }
 
 enum class RacePhase { COUNTDOWN, RACING, FINISHED }
@@ -59,12 +75,26 @@ data class RaceConfig(
     val partnerStrength: Double = 1.0,
     /** Tempo race: points are awarded from this lap on. */
     val tempoFirstScoringLap: Int = 5,
+    /** Number of ghosts (bunch races only; 1v1 and pursuit always have one). */
+    val fieldSize: Int = 1,
+    /** With a field, each ghost's riding power wanders randomly between these fractions of your FTP. */
+    val fieldMinLevel: Double = 0.60,
+    val fieldMaxLevel: Double = 1.25,
+    /** Seed for the field's random strengths and sprint choices. */
+    val seed: Long = 1L,
+    /** Elimination race: the last rider over the line every N laps is out. */
+    val eliminationEveryLaps: Int = 2,
     val countdownSeconds: Double = 3.0,
     val track: Track = Track(),
 ) {
     val ghostFtpWatts: Double get() = riderFtpWatts * ghostStrength
     val partnerFtpWatts: Double get() = riderFtpWatts * partnerStrength
-    val raceDistanceMeters: Double get() = laps * track.lapLength
+    val ghostCount: Int get() = if (mode.supportsField) fieldSize.coerceIn(1, Field.MAX_GHOSTS) else 1
+
+    /** An elimination lasts until one rider is left: one elimination per ghost. */
+    val effectiveLaps: Int get() = if (mode == RaceMode.ELIMINATION) eliminationEveryLaps * ghostCount else laps
+
+    val raceDistanceMeters: Double get() = effectiveLaps * track.lapLength
 
     /** Where the ghost starts: half a lap away in a pursuit, otherwise any head start. */
     val ghostStartMeters: Double get() = if (mode.isPursuit) track.lapLength / 2 else ghostHeadStartMeters
@@ -79,27 +109,33 @@ data class RaceConfig(
         return when (mode) {
             RaceMode.POINTS_RACE, RaceMode.MADISON -> {
                 val every = sprintEveryLaps.coerceAtLeast(1)
-                (every until laps step every).map { it * lap } + raceDistanceMeters
+                (every until effectiveLaps step every).map { it * lap } + raceDistanceMeters
             }
             RaceMode.TEMPO -> {
-                val first = tempoFirstScoringLap.coerceIn(1, laps)
-                (first..laps).map { it * lap }
+                val first = tempoFirstScoringLap.coerceIn(1, effectiveLaps)
+                (first..effectiveLaps).map { it * lap }
             }
             else -> emptyList()
         }
     }
 
-    /** (winner's points, other's points) for sprint [index] of [count]. */
-    fun sprintPoints(index: Int, count: Int): Pair<Int, Int> = when {
-        mode == RaceMode.TEMPO -> TEMPO_POINTS to 0
-        index == count - 1 -> SPRINT_POINTS_FIRST * 2 to SPRINT_POINTS_SECOND * 2
-        else -> SPRINT_POINTS_FIRST to SPRINT_POINTS_SECOND
+    /** Elimination race: where a rider is knocked out. The last one is the finish. */
+    fun eliminationLines(): List<Double> =
+        if (mode != RaceMode.ELIMINATION) emptyList()
+        else (1..ghostCount).map { it * eliminationEveryLaps * track.lapLength }
+
+    /** Points for 1st, 2nd, ... at sprint [index] of [count]. */
+    fun sprintTable(index: Int, count: Int): IntArray = when {
+        mode == RaceMode.TEMPO -> intArrayOf(TEMPO_POINTS)
+        index == count - 1 -> SPRINT_TABLE.map { it * 2 }.toIntArray()
+        else -> SPRINT_TABLE
     }
 
-    /** Lines the ghost (and your Madison partner) kick for. */
+    /** Lines the ghosts (and your Madison partner) kick for. */
     fun ghostTargetLines(): List<Double> = when {
         mode.isPursuit -> emptyList()
         mode.isPointsBased -> sprintLines()
+        mode == RaceMode.ELIMINATION -> eliminationLines()
         else -> listOf(raceDistanceMeters)
     }
 
@@ -110,6 +146,8 @@ data class RaceConfig(
     companion object {
         const val SPRINT_POINTS_FIRST = 5
         const val SPRINT_POINTS_SECOND = 3
+        /** Points for the first four over a sprint line (5 / 3 / 2 / 1). */
+        val SPRINT_TABLE = intArrayOf(5, 3, 2, 1)
         const val TEMPO_POINTS = 1
         const val LAP_GAIN_POINTS = 20
     }
@@ -132,9 +170,38 @@ data class SprintResult(
     val lap: Int,
     val winner: Competitor,
     val riderPoints: Int,
+    /** Points scored by the best-placed ghost. */
     val ghostPoints: Int,
     val isFinal: Boolean,
+    /** Competitor ids in the order they took the points. */
+    val placings: List<Int> = emptyList(),
+    val winnerName: String = "",
+    /** Your placing in the sprint, if you were in the points. */
+    val riderPlace: Int? = null,
 )
+
+data class GhostSnapshot(
+    val id: Int,
+    val name: String,
+    val rider: RiderSnapshot,
+    /** Current riding level as a fraction of your FTP (a lone ghost: its strength). */
+    val level: Double,
+    val eliminated: Boolean,
+)
+
+/** One line of the live classification. */
+data class Standing(
+    val id: Int,
+    val name: String,
+    val place: Int,
+    /** Sprint points + lap points (points races), 0 otherwise. */
+    val points: Int,
+    val distance: Double,
+    val finishTimeSec: Double?,
+    val eliminated: Boolean,
+) {
+    val isYou: Boolean get() = id == 0
+}
 
 data class RaceState(
     val mode: RaceMode,
@@ -143,8 +210,12 @@ data class RaceState(
     val elapsedSec: Double,
     /** You (in a Madison: your team, whoever of you is racing). */
     val rider: RiderSnapshot,
+    /** The single ghost, or in a field the ghost nearest to you on the track. */
     val ghost: RiderSnapshot,
-    /** Positive = you are ahead. In a pursuit this compares distance from each rider's own start. */
+    /**
+     * Positive = you are ahead. In a pursuit this compares distance from each rider's own start.
+     * In a field it's the gap to the leader (or, if you lead, to second place).
+     */
     val gapMeters: Double,
     val gapSeconds: Double,
     val raceDistanceMeters: Double,
@@ -172,7 +243,18 @@ data class RaceState(
     val partnerPowerWatts: Double = 0.0,
     /** Pursuit: who caught whom, if anyone. */
     val caughtBy: Competitor? = null,
+    /** Every ghost, including eliminated ones. */
+    val ghosts: List<GhostSnapshot> = emptyList(),
+    /** Live classification, best first. */
+    val standings: List<Standing> = emptyList(),
+    /** Your place in [standings]. */
+    val riderPlace: Int = 1,
+    /** Your place on the road (by distance) among riders still racing. */
+    val roadPosition: Int = 1,
+    val fieldSize: Int = 1,
 ) {
+    val isField: Boolean get() = fieldSize > 1
+    val ridersRacing: Int get() = 1 + ghosts.count { !it.eliminated } - if (standings.any { it.isYou && it.eliminated }) 1 else 0
     val riderLapsCompleted: Int get() = (rider.distance / lapLength).toInt().coerceIn(0, totalLaps)
     val currentLap: Int get() = (riderLapsCompleted + 1).coerceAtMost(totalLaps)
     val distanceToGo: Double get() = (raceDistanceMeters - rider.distance).coerceAtLeast(0.0)

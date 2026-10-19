@@ -10,6 +10,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
+import com.velodromeghost.app.Palette
 import com.velodromeghost.core.race.RaceState
 import com.velodromeghost.core.race.RiderSnapshot
 import com.velodromeghost.core.track.Track
@@ -28,6 +29,9 @@ object PovRenderer {
     private const val CAM_HEIGHT = 1.35
     private const val CAM_LATERAL = 1.2
     private const val GHOST_LATERAL = 2.1
+
+    /** Where each rider in a field sits across the track (m from the inside edge). */
+    private val FIELD_LANES = doubleArrayOf(2.1, 3.1, 1.4, 4.0, 2.6, 3.6, 1.8, 4.6, 2.9, 1.1, 3.3)
     private const val FAR = 110.0
     private const val SLICES = 80
     private const val CURVE_GAIN = 0.85
@@ -156,25 +160,28 @@ object PovRenderer {
             transverse(0.0, Color.Black, 0.12)
             transverse(track.twoHundredLineDistance, Color.White, 0.08)
 
-            // The ghost
-            val zg = track.wrappedDelta(me, state.ghost.distance)
-            if (zg > zNear * 0.6 && zg < FAR) {
-                val d = dispAt(zg)
-                val x = sx(zg, GHOST_LATERAL, d)
+            // The ghosts, furthest first so nearer riders are drawn on top.
+            val riders = state.ghosts.filter { !it.eliminated }
+                .map { it to track.wrappedDelta(me, it.rider.distance) }
+                .filter { (_, z) -> z > zNear * 0.6 && z < FAR }
+                .sortedByDescending { (_, z) -> z }
+            for ((g, zg) in riders) {
+                val lateral = if (state.isField) FIELD_LANES[(g.id - 1) % FIELD_LANES.size] else GHOST_LATERAL
+                val x = sx(zg, lateral, dispAt(zg))
                 val y = sy(zg)
                 val scale = (focal / zg).toFloat()
-                drawCyclist(x, y, scale, state.ghost, ghost = true)
+                drawCyclist(x, y, scale, g.rider, Palette.competitor(g.id, state.fieldSize))
             }
         }
 
         drawCockpit(w.toFloat(), h.toFloat(), state.rider)
     }
 
-    private fun DrawScope.drawCyclist(x: Float, y: Float, s: Float, rider: RiderSnapshot, ghost: Boolean) {
-        val body = if (ghost) Color(0xCC8BEAFF) else Color(0xFFFF9800)
-        val dark = if (ghost) Color(0x995BC0D8) else Color(0xFF333333)
-        val glow = Color(0x228BEAFF)
-        if (ghost) drawCircle(glow, radius = 1.1f * s, center = Offset(x, y - 0.9f * s))
+    private fun DrawScope.drawCyclist(x: Float, y: Float, s: Float, rider: RiderSnapshot, color: Color) {
+        val body = color.copy(alpha = 0.8f)
+        val dark = color.copy(alpha = 0.6f)
+        val glow = color.copy(alpha = 0.13f)
+        drawCircle(glow, radius = 1.1f * s, center = Offset(x, y - 0.9f * s))
 
         // Rear wheel seen from behind: a thin upright bar.
         drawRoundRect(
@@ -192,7 +199,7 @@ object PovRenderer {
         drawLine(body, Offset(x + 0.1f * s, y - 0.98f * s), Offset(x + 0.11f * s, y - 0.34f * s + rightFoot), legWidth, StrokeCap.Round)
         // Back (crouched, wide from behind) and helmet
         drawOval(body, topLeft = Offset(x - 0.22f * s, y - 1.42f * s), size = Size(0.44f * s, 0.55f * s))
-        drawCircle(if (ghost) Color(0xEEFFFFFF) else Color(0xFF212121), radius = 0.13f * s, center = Offset(x, y - 1.5f * s))
+        drawCircle(Color(0xEEFFFFFF), radius = 0.13f * s, center = Offset(x, y - 1.5f * s))
     }
 
     /** Your front wheel and handlebars, fixed to the screen. */

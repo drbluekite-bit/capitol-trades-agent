@@ -51,6 +51,7 @@ import com.velodromeghost.app.data.ResistanceMode
 import com.velodromeghost.app.ui.OverviewRenderer.drawOverview
 import com.velodromeghost.app.ui.PovRenderer.drawPov
 import com.velodromeghost.core.race.Competitor
+import com.velodromeghost.core.race.GhostSnapshot
 import com.velodromeghost.core.race.RaceMode
 import com.velodromeghost.core.race.RacePhase
 import com.velodromeghost.core.race.RaceState
@@ -170,10 +171,21 @@ private fun PovPanel(st: RaceState, track: Track, resistance: ResistanceMode, wo
             Modifier.align(Alignment.TopEnd).padding(10.dp).hud(),
             horizontalAlignment = Alignment.End,
         ) {
-            Small("GHOST", Palette.ghost)
-            Big("${st.ghost.powerWatts.roundToInt()}", "W", Palette.ghost, size = 26.sp)
-            Small("${st.ghost.cadenceRpm.roundToInt()} rpm · %.1f km/h".format(st.ghost.speedKmh), Palette.ghost)
-            workoutName?.let { Small(it, Palette.muted) }
+            val nearest = nearestGhost(st)
+            val color = nearest?.let { Palette.competitor(it.id, st.fieldSize) } ?: Palette.ghost
+            if (st.isField) {
+                Small("NEAREST: ${nearest?.name?.uppercase() ?: "-"}", color)
+            } else {
+                Small("GHOST", color)
+            }
+            Big("${st.ghost.powerWatts.roundToInt()}", "W", color, size = 26.sp)
+            Small("${st.ghost.cadenceRpm.roundToInt()} rpm · %.1f km/h".format(st.ghost.speedKmh), color)
+            if (st.isField) {
+                nearest?.let { Small("riding at ${(it.level * 100).roundToInt()}% FTP", Palette.muted) }
+                Small("${ordinal(st.roadPosition)} of ${st.ridersRacing} on the road", Color.White)
+            } else {
+                workoutName?.let { Small(it, Palette.muted) }
+            }
         }
         // Race status / announcements
         Column(
@@ -219,10 +231,11 @@ private fun PovPanel(st: RaceState, track: Track, resistance: ResistanceMode, wo
         }
         // Where's the ghost if you can't see it?
         val ahead = track.wrappedDelta(st.rider.distance, st.ghost.distance)
+        val who = if (st.isField) nearestGhost(st)?.name ?: "Ghost" else "Ghost"
         val hint = when {
             st.mode.isPursuit -> "Pursuit: ghost started on the far side of the track"
-            ahead > -1.5 && ahead < 1.5 -> "Ghost alongside!"
-            ahead < 0 -> "▼ Ghost %.1f m behind".format(-ahead)
+            ahead > -1.5 && ahead < 1.5 -> "$who alongside!"
+            ahead < 0 -> "▼ $who %.1f m behind".format(-ahead)
             else -> null
         }
         Column(
@@ -246,6 +259,7 @@ private fun OverviewPanel(st: RaceState, track: Track) {
         Canvas(Modifier.weight(1f).fillMaxWidth()) { drawOverview(st, track, measurer) }
         GapBar(st)
         if (st.mode.isPointsBased) PointsBoard(st)
+        if (st.isField) FieldBoard(st)
     }
 }
 
@@ -253,7 +267,11 @@ private fun OverviewPanel(st: RaceState, track: Track) {
 private fun GapBar(st: RaceState) {
     val gap = st.gapMeters
     val color = if (gap >= 0) Palette.good else Palette.bad
+    val leader = st.ghosts.filter { !it.eliminated }.maxByOrNull { it.rider.distance }
     val label = when {
+        st.isField && abs(gap) < 0.5 -> "Level with the leader"
+        st.isField && gap > 0 -> "You lead by %.1f m  (%.1f s)".format(gap, st.gapSeconds)
+        st.isField -> "${leader?.name ?: "Leader"} leads you by %.1f m  (%.1f s)".format(-gap, -st.gapSeconds)
         abs(gap) < 0.5 -> "Level with the ghost"
         st.mode.isPursuit && gap > 0 -> "You +%.2f s  (%.1f m) · catch at +%.0f m".format(st.gapSeconds, gap, st.lapLength / 2)
         st.mode.isPursuit -> "Ghost +%.2f s  (%.1f m)".format(-st.gapSeconds, -gap)
@@ -277,7 +295,7 @@ private fun GapBar(st: RaceState) {
             drawCircle(color, radius = size.height / 2, center = Offset(x, size.height / 2))
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Small("ghost ahead", Palette.muted)
+            Small(if (st.isField) "leader ahead" else "ghost ahead", Palette.muted)
             Small("you ahead", Palette.muted)
         }
     }
@@ -292,7 +310,8 @@ private fun PointsBoard(st: RaceState) {
         Column(Modifier.weight(1f)) {
             Small("POINTS", Palette.accent)
             Text(
-                "YOU ${st.riderTotalPoints}   ·   GHOST ${st.ghostTotalPoints}",
+                if (st.isField) "YOU ${st.riderTotalPoints}  ·  ${ordinal(st.riderPlace)} of ${st.standings.size}"
+                else "YOU ${st.riderTotalPoints}   ·   GHOST ${st.ghostTotalPoints}",
                 color = Color.White,
                 fontWeight = FontWeight.Black,
                 fontSize = 18.sp,
@@ -318,6 +337,53 @@ private fun PointsBoard(st: RaceState) {
             )
         }
     }
+}
+
+/** Live classification for a field: the top five, plus you if you're further down. */
+@Composable
+private fun FieldBoard(st: RaceState) {
+    val top = st.standings.take(5)
+    val shown = if (top.any { it.isYou }) top else top + st.standings.first { it.isYou }
+    Column(
+        Modifier.fillMaxWidth().padding(top = 4.dp).background(Color(0xFF151C33), RoundedCornerShape(8.dp)).padding(8.dp),
+    ) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Small(if (st.mode.isPointsBased) "CLASSIFICATION" else "ON THE ROAD", Palette.accent)
+            if (st.mode == RaceMode.ELIMINATION) {
+                val next = st.nextSprintLap?.let { it - st.riderLapsCompleted }
+                Small("${st.ridersRacing} left" + (next?.let { " · next out in $it laps" } ?: ""), Color.White)
+            }
+        }
+        shown.forEach { row ->
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                val color = if (row.eliminated) Palette.muted else Palette.competitor(row.id, st.fieldSize)
+                Text(
+                    "${row.place}. ${row.name}" + if (row.eliminated) " (out)" else "",
+                    color = color,
+                    fontSize = 13.sp,
+                    fontWeight = if (row.isYou) FontWeight.Black else FontWeight.SemiBold,
+                )
+                if (st.mode.isPointsBased) Text("${row.points} pts", color = color, fontSize = 13.sp)
+                else if (!row.eliminated) {
+                    val behind = row.distance - st.rider.distance
+                    Text(if (row.isYou) "" else "%+.0f m".format(behind), color = color, fontSize = 13.sp)
+                }
+            }
+        }
+    }
+}
+
+private fun nearestGhost(st: RaceState): GhostSnapshot? =
+    st.ghosts.filter { !it.eliminated }.minByOrNull { abs(it.rider.distance - st.ghost.distance) }
+
+private fun ordinal(n: Int): String {
+    val suffix = if (n % 100 in 11..13) "th" else when (n % 10) {
+        1 -> "st"
+        2 -> "nd"
+        3 -> "rd"
+        else -> "th"
+    }
+    return "$n$suffix"
 }
 
 private fun Modifier.hud() = this.background(Color(0x88000000), RoundedCornerShape(8.dp)).padding(horizontal = 8.dp, vertical = 4.dp)

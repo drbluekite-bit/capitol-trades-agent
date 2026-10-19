@@ -52,6 +52,7 @@ import com.velodromeghost.app.RaceViewModel
 import com.velodromeghost.app.ble.ConnectionState
 import com.velodromeghost.app.data.AppSettings
 import com.velodromeghost.app.data.RaceType
+import com.velodromeghost.core.race.Field
 import com.velodromeghost.app.data.ResistanceMode
 import kotlin.math.roundToInt
 
@@ -295,7 +296,8 @@ private fun RaceTypeCard(vm: RaceViewModel, s: AppSettings) {
                     vm.update { it.copy(sprintEveryLaps = v) }
                 }
                 Text(
-                    "With a single ghost the elimination is decided at the first elimination sprint (2 laps).",
+                    "Elimination: the last rider over the line every 2 laps is out until one is left " +
+                        "(with a single ghost, the first elimination decides it).",
                     fontSize = 12.sp,
                     color = Palette.muted,
                 )
@@ -311,7 +313,29 @@ private fun GhostCard(vm: RaceViewModel, s: AppSettings) {
         if (uri != null) vm.importWorkout(uri)
     }
 
-    Section("3 · Ghost rider") {
+    Section(if (s.hasField && s.fieldSize > 1) "3 · Ghost riders" else "3 · Ghost rider") {
+        if (s.hasField) {
+            Text("Field", fontWeight = FontWeight.Bold)
+            Stepper("Ghost riders", s.fieldSize, 1..Field.MAX_GHOSTS, suffix = if (s.fieldSize == 1) " (head to head)" else "") { v ->
+                vm.update { it.copy(fieldSize = v) }
+            }
+            if (s.fieldSize > 1) {
+                LabeledSlider("Weakest", s.fieldMinPct, 40..150, "% of your FTP (${s.ftpWatts * s.fieldMinPct / 100} W)") { v ->
+                    vm.update { it.copy(fieldMinPct = v, fieldMaxPct = maxOf(it.fieldMaxPct, v)) }
+                }
+                LabeledSlider("Strongest", s.fieldMaxPct, 40..150, "% of your FTP (${s.ftpWatts * s.fieldMaxPct / 100} W)") { v ->
+                    vm.update { it.copy(fieldMaxPct = v, fieldMinPct = minOf(it.fieldMinPct, v)) }
+                }
+                Text(
+                    "Each ghost's power wanders randomly anywhere in this range during the race, changing every " +
+                        "20-75 s, so riders surge and fade. Each has its own sprint and they don't all contest every " +
+                        "sprint. The pacing and strength settings below are for head-to-head races (and your Madison partner's pacing).",
+                    fontSize = 12.sp,
+                    color = Palette.muted,
+                )
+            }
+            HorizontalDivider()
+        }
         Text("Pacing", fontWeight = FontWeight.Bold)
         RadioRow(
             "Constant pace",

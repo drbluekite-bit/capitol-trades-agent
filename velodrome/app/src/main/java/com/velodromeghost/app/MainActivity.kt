@@ -53,6 +53,18 @@ object Palette {
     val bad = Color(0xFFE53935)
     val accent = Color(0xFFFFC107)
     val muted = Color(0xFF9AA4C0)
+
+    private val field = listOf(
+        Color(0xFF8BEAFF), Color(0xFFB2FF59), Color(0xFFFF80AB), Color(0xFFFFD740), Color(0xFFB388FF), Color(0xFFFF8A65),
+        Color(0xFF64FFDA), Color(0xFFFFE57F), Color(0xFF80D8FF), Color(0xFFA7FFEB), Color(0xFFF48FB1),
+    )
+
+    /** Colour for competitor [id] (0 = you); matches the ghost's name (Cyan, Lime, Pink...). */
+    fun competitor(id: Int, fieldSize: Int): Color = when {
+        id == 0 -> rider
+        fieldSize <= 1 -> ghost
+        else -> field[(id - 1) % field.size]
+    }
 }
 
 @Composable
