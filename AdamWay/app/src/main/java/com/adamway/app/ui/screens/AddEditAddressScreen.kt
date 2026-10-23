@@ -90,7 +90,19 @@ fun AddEditAddressScreen(
     }
 
     fun applyMapSuggestion(suggestion: String) {
-        addressText = suggestion
+        // Nominatim sometimes only has street-level data for a road (no
+        // individual house numbers mapped), so its suggestion text can
+        // start with just the road name — e.g. typing "49 Dowland Avenue"
+        // offers only "Dowland Avenue, ...". Tapping that shouldn't lose
+        // the house number you'd already typed, so keep it prefixed
+        // unless the suggestion already starts with it.
+        val typedNumber = Regex("^\\s*(\\d+[A-Za-z]?)\\b").find(addressText)?.groupValues?.get(1)
+        val suggestionLeadingWord = suggestion.trimStart().takeWhile { it.isLetterOrDigit() }
+        addressText = if (typedNumber != null && !suggestionLeadingWord.equals(typedNumber, ignoreCase = true)) {
+            "$typedNumber $suggestion"
+        } else {
+            suggestion
+        }
         selectedSavedAddressId = null
         suggestions = emptyList()
         mapSuggestions = emptyList()
@@ -238,14 +250,6 @@ fun AddEditAddressScreen(
                 placeholder = { Text("e.g. 24 Sandybrook Close, Bury BL8 3LB") },
                 modifier = Modifier.fillMaxWidth(),
             )
-            OutlinedTextField(
-                value = what3words,
-                onValueChange = { what3words = it; selectedSavedAddressId = null },
-                label = { Text("what3words (optional)") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                prefix = { Text("///") },
-            )
 
             if (isSearchingAddress) {
                 Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
@@ -284,6 +288,15 @@ fun AddEditAddressScreen(
                     }
                 }
             }
+
+            OutlinedTextField(
+                value = what3words,
+                onValueChange = { what3words = it; selectedSavedAddressId = null },
+                label = { Text("what3words (optional)") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                prefix = { Text("///") },
+            )
 
             if (suggestions.isNotEmpty()) {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {

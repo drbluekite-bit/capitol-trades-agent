@@ -9,9 +9,14 @@ picker tops out at around 10. Black background, white "AW" logo.
 1. **Add addresses** to a queue (up to 18) by typing one address into a
    single field, exactly as you would into Google Maps' own search bar
    (e.g. "24 Sandybrook Close, Bury BL8 3LB") — **matching addresses show
-   up as you type**, the same way Maps' own search bar suggests results,
-   so you can tap the complete, correctly-formatted line (postcode
-   included) instead of typing the whole thing out. You can also
+   up directly beneath that field as you type**, the same way Maps' own
+   search bar suggests results, so you can tap the complete,
+   correctly-formatted line (postcode included) instead of typing the
+   whole thing out. If Nominatim only has street-level data for the road
+   you're on (no individual house numbers mapped — common on smaller
+   streets), a suggestion can be just the road name with no number; in
+   that case tapping it keeps the house number you'd already typed rather
+   than dropping it. You can also
    photograph an envelope, door plaque, etc. and let on-device text
    recognition fill in that field, or tap **Speak address** and say it
    out loud. A what3words address is optional, as an alternative or
