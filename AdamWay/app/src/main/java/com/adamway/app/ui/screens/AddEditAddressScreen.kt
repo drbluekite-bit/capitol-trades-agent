@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Place
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -53,6 +54,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.adamway.app.data.SavedAddress
+import com.adamway.app.maps.MapsLauncher
 import com.adamway.app.viewmodel.AddressEvent
 import com.adamway.app.viewmodel.AddressViewModel
 import kotlinx.coroutines.delay
@@ -286,6 +288,31 @@ fun AddEditAddressScreen(
                             }
                         }
                     }
+                }
+            } else if (!isSearchingAddress && !suppressMapSuggestions && addressText.trim().length >= 5) {
+                // Nominatim's free OpenStreetMap data has much weaker
+                // coverage of businesses, care homes, schools etc. than
+                // Google's own database — a name search turning up nothing
+                // here doesn't mean Maps won't find it. Say so, rather than
+                // leaving it looking broken.
+                Text(
+                    "No suggestions for this one — that's OK, OpenStreetMap's free data doesn't have every business or care home. Google Maps probably still does; search for it below, or just finish typing the full name and address.",
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f),
+                )
+            }
+
+            if (addressText.trim().length >= 3) {
+                // Not satisfied with the suggestions above (wrong, or none
+                // at all)? Check the real thing in Google Maps itself —
+                // this just opens a place search there, the same as typing
+                // into Maps' own search bar, so you can see the actual
+                // listing and copy its exact wording back here by hand.
+                OutlinedButton(
+                    onClick = { MapsLauncher.openSearch(context, addressText) },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Icon(Icons.Filled.Search, contentDescription = null)
+                    Text("  Not right? Search in Google Maps")
                 }
             }
 

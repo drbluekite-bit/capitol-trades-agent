@@ -40,13 +40,24 @@ class NominatimClient {
     /** Up to [limit] candidate address lines matching [query], most relevant first — text only. */
     suspend fun suggest(query: String, limit: Int = 5): List<String> = withContext(Dispatchers.IO) {
         if (query.isBlank()) return@withContext emptyList()
+        // Try strictly within South & West Yorkshire first (see
+        // searchOnce's doc); if that finds nothing, retry across all of
+        // GB rather than leaving the suggestion list empty — a real match
+        // just outside the box, or one Nominatim's bounding filter missed
+        // for some other reason, is still better shown than hidden.
+        val bounded = searchOnce(query, limit, bounded = true)
+        if (bounded.isNotEmpty()) bounded else searchOnce(query, limit, bounded = false)
+    }
+
+    private suspend fun searchOnce(query: String, limit: Int, bounded: Boolean): List<String> {
         try {
-            val url = "https://nominatim.openstreetmap.org/search".toHttpUrl()
+            val urlBuilder = "https://nominatim.openstreetmap.org/search".toHttpUrl()
                 .newBuilder()
                 .addQueryParameter("q", query)
                 .addQueryParameter("format", "jsonv2")
                 .addQueryParameter("limit", limit.toString())
                 .addQueryParameter("countrycodes", "gb")
+            if (bounded) {
                 // Adam Way is used primarily around South & West Yorkshire
                 // (Sheffield/Rotherham/Doncaster/Barnsley/Leeds/Bradford/
                 // Wakefield/Huddersfield/Halifax). Without this, a query
@@ -55,14 +66,13 @@ class NominatimClient {
                 // *only* match for — the actually-intended local one,
                 // which is exactly what was happening ("miles away", or
                 // just one irrelevant suggestion). bounded=1 makes this a
-                // hard restriction rather than just a ranking nudge, which
-                // is fine here: typing a full address manually still works
-                // for a genuine one-off trip outside this area — it's only
-                // the suggestion dropdown that's scoped to home turf.
+                // hard restriction rather than just a ranking nudge.
                 // Adjust this box here if the app's home area changes.
-                .addQueryParameter("viewbox", "-2.05,53.95,-0.85,53.25")
-                .addQueryParameter("bounded", "1")
-                .build()
+                urlBuilder
+                    .addQueryParameter("viewbox", "-2.05,53.95,-0.85,53.25")
+                    .addQueryParameter("bounded", "1")
+            }
+            val url = urlBuilder.build()
 
             val request = Request.Builder()
                 .url(url)
@@ -72,8 +82,8 @@ class NominatimClient {
                 .get()
                 .build()
 
-            client.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) return@withContext emptyList()
+            return client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) return emptyList()
                 val body = response.body?.string().orEmpty()
                 json.decodeFromString<List<NominatimResult>>(body)
                     .map { formatSuggestion(it.displayName) }
@@ -81,7 +91,7 @@ class NominatimClient {
                     .distinct()
             }
         } catch (e: Exception) {
-            emptyList()
+            return emptyList()
         }
     }
 

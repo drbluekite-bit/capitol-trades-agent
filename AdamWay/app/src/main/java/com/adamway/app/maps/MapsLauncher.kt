@@ -43,6 +43,20 @@ object MapsLauncher {
     }
 
     /**
+     * Opens Google Maps' own search results for [query] — not directions,
+     * just a plain place search, exactly like typing into the Maps app's
+     * search bar. For when the in-app suggestion list (sourced from free
+     * OpenStreetMap data, which has much weaker business/POI coverage than
+     * Google's own) doesn't have what you're looking for, or doesn't look
+     * right: you can check Maps itself, see the real listing, and copy its
+     * wording back into the address field by hand.
+     */
+    fun openSearch(context: Context, query: String) {
+        val uri = "https://www.google.com/maps/search/?api=1&query=${Uri.encode(query)}"
+        launch(context, uri, "com.google.android.apps.maps")
+    }
+
+    /**
      * Google's documented Maps URL format expects a literal, unencoded
      * comma for a "lat,lng" coordinate pair — percent-encoding it to %2C
      * (which a blanket Uri.encode() would do) makes the Maps app reject

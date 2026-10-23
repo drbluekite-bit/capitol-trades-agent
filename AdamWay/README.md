@@ -16,7 +16,15 @@ picker tops out at around 10. Black background, white "AW" logo.
    you're on (no individual house numbers mapped — common on smaller
    streets), a suggestion can be just the road name with no number; in
    that case tapping it keeps the house number you'd already typed rather
-   than dropping it. You can also
+   than dropping it. OpenStreetMap's free data doesn't cover every
+   business, school, or care home the way Google's own does, so sometimes
+   there's no suggestion at all (or the one you want isn't in the list) —
+   a **"Search in Google Maps" button** right below the suggestions opens
+   a plain Maps search for whatever you've typed so far, so you can check
+   the real listing there and copy its exact wording back by hand; it
+   doesn't stop you adding the stop either way, since Maps/Waze geocode
+   the final text themselves regardless of whether a suggestion was used.
+   You can also
    photograph an envelope, door plaque, etc. and let on-device text
    recognition fill in that field, or tap **Speak address** and say it
    out loud. A what3words address is optional, as an alternative or
@@ -100,7 +108,16 @@ or background service.
   (Sheffield/Rotherham/Doncaster/Barnsley/Leeds/Bradford/Wakefield/
   Huddersfield/Halifax), since that's where this app is actually used.
   Typing a full address by hand still works for a genuine one-off trip
-  further afield — only the suggestion dropdown is scoped to home turf.
+  further afield — only the suggestion dropdown is scoped to home turf,
+  and it retries unrestricted across GB if the scoped search finds
+  nothing, rather than coming up empty when a real match just happens to
+  sit outside the box. Even then, free OpenStreetMap data simply doesn't
+  index every business, school, or care home the way Google's own
+  database does — when the dropdown has nothing (or nothing right), the
+  **"Search in Google Maps"** button opens a plain Maps search for
+  whatever's typed so far, to check the real listing and copy its wording
+  back in by hand. This never blocks adding the stop either way, since
+  the typed text is what gets geocoded at journey time regardless.
 - **what3words is optional and needs your own free API key.** A
   `///three.word.address` means nothing to Google Maps's geocoder — so if
   you want a what3words-only stop included in the *same* multi-stop
