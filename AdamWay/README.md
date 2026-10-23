@@ -83,7 +83,19 @@ or background service.
   different from a keyboard's predictive text) — tapping a suggestion
   only fills the field with a complete, well-formatted line; its
   coordinate is never looked at, let alone trusted, by anything in this
-  app.
+  app. Two things about that dropdown were wrong at first and are now
+  fixed: it showed only a reconstructed "number, road, postcode" line,
+  which gave no way to tell a business or school apart from any other
+  address on the same road (its actual name was silently dropped); it
+  now shows Nominatim's own description instead, which leads with the
+  name when there is one. And the search had no geographic bias at all,
+  so a street or business name that also exists somewhere else in Great
+  Britain could show up as the only match, miles from the right one —
+  it's now restricted to a South & West Yorkshire bounding box
+  (Sheffield/Rotherham/Doncaster/Barnsley/Leeds/Bradford/Wakefield/
+  Huddersfield/Halifax), since that's where this app is actually used.
+  Typing a full address by hand still works for a genuine one-off trip
+  further afield — only the suggestion dropdown is scoped to home turf.
 - **what3words is optional and needs your own free API key.** A
   `///three.word.address` means nothing to Google Maps's geocoder — so if
   you want a what3words-only stop included in the *same* multi-stop

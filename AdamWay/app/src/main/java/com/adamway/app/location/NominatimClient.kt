@@ -33,16 +33,8 @@ class NominatimClient {
     private val json = Json { ignoreUnknownKeys = true }
 
     @Serializable
-    private data class NominatimAddress(
-        @SerialName("house_number") val houseNumber: String? = null,
-        val road: String? = null,
-        val postcode: String? = null,
-    )
-
-    @Serializable
     private data class NominatimResult(
         @SerialName("display_name") val displayName: String = "",
-        val address: NominatimAddress? = null,
     )
 
     /** Up to [limit] candidate address lines matching [query], most relevant first — text only. */
@@ -53,13 +45,23 @@ class NominatimClient {
                 .newBuilder()
                 .addQueryParameter("q", query)
                 .addQueryParameter("format", "jsonv2")
-                .addQueryParameter("addressdetails", "1")
                 .addQueryParameter("limit", limit.toString())
-                // Adam Way's address parsing already assumes UK postcodes
-                // throughout, so restricting to Great Britain avoids a
-                // short/ambiguous query surfacing an irrelevant suggestion
-                // from the other side of the world.
                 .addQueryParameter("countrycodes", "gb")
+                // Adam Way is used primarily around South & West Yorkshire
+                // (Sheffield/Rotherham/Doncaster/Barnsley/Leeds/Bradford/
+                // Wakefield/Huddersfield/Halifax). Without this, a query
+                // that textually matches a street or business name
+                // elsewhere in Great Britain could rank above — or be the
+                // *only* match for — the actually-intended local one,
+                // which is exactly what was happening ("miles away", or
+                // just one irrelevant suggestion). bounded=1 makes this a
+                // hard restriction rather than just a ranking nudge, which
+                // is fine here: typing a full address manually still works
+                // for a genuine one-off trip outside this area — it's only
+                // the suggestion dropdown that's scoped to home turf.
+                // Adjust this box here if the app's home area changes.
+                .addQueryParameter("viewbox", "-2.05,53.95,-0.85,53.25")
+                .addQueryParameter("bounded", "1")
                 .build()
 
             val request = Request.Builder()
@@ -74,23 +76,27 @@ class NominatimClient {
                 if (!response.isSuccessful) return@withContext emptyList()
                 val body = response.body?.string().orEmpty()
                 json.decodeFromString<List<NominatimResult>>(body)
-                    .map { formatSuggestion(it) }
+                    .map { formatSuggestion(it.displayName) }
                     .filter { it.isNotBlank() }
+                    .distinct()
             }
         } catch (e: Exception) {
             emptyList()
         }
     }
 
-    private fun formatSuggestion(result: NominatimResult): String {
-        val numberAndRoad = listOf(result.address?.houseNumber.orEmpty(), result.address?.road.orEmpty())
-            .filter { it.isNotBlank() }
-            .joinToString(" ")
-        val postcode = result.address?.postcode.orEmpty()
-        return when {
-            numberAndRoad.isNotBlank() && postcode.isNotBlank() -> "$numberAndRoad, $postcode"
-            numberAndRoad.isNotBlank() -> numberAndRoad
-            else -> result.displayName
-        }
+    /**
+     * Nominatim's own [displayName] is usually the clearest thing to show —
+     * unlike a line rebuilt from just house-number/road/postcode, it already
+     * leads with a business or school's actual name when the match is one
+     * (e.g. "Tesco Extra, Pontefract Road, Stairfoot, Barnsley, ... S70 3NS"
+     * rather than just "Pontefract Road, S70 3NS", which gave no way to
+     * tell it apart from any other address on that road). This just trims
+     * the redundant country/constituent-country suffix Nominatim always
+     * appends.
+     */
+    private fun formatSuggestion(displayName: String): String {
+        val redundant = setOf("United Kingdom", "England", "Scotland", "Wales", "Northern Ireland")
+        return displayName.split(", ").filterNot { it in redundant }.joinToString(", ")
     }
 }
