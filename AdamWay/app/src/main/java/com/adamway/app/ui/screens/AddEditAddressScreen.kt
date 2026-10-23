@@ -278,6 +278,45 @@ fun AddEditAddressScreen(
                 modifier = Modifier.fillMaxWidth(),
             )
 
+            // Checked in this order: your own saved addresses/favorites
+            // first (instant, no network — and the one source that's
+            // actually yours), then OpenStreetMap's free data. Only once
+            // both come up empty is "Search in Google Maps" offered, as
+            // the last resort rather than the first thing you see.
+            if (suggestions.isNotEmpty()) {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        "From memory:",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
+                    )
+                    suggestions.forEach { suggestion ->
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(MaterialTheme.colorScheme.surface)
+                                .clickable { applySuggestion(suggestion) }
+                                .padding(12.dp),
+                        ) {
+                            Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                                Icon(
+                                    if (suggestion.favoriteLabel.isNullOrBlank()) Icons.Filled.History else Icons.Filled.Star,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    suggestion.favoriteLabel?.takeIf { it.isNotBlank() }?.let { "$it — ${suggestion.displayLabel}" }
+                                        ?: suggestion.displayLabel,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
             if (isSearchingAddress) {
                 Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                     CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
@@ -289,7 +328,7 @@ fun AddEditAddressScreen(
             if (mapSuggestions.isNotEmpty()) {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(
-                        "Matching addresses — tap the exact one:",
+                        "Matching addresses (OpenStreetMap) — tap the exact one:",
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
                     )
@@ -314,30 +353,30 @@ fun AddEditAddressScreen(
                         }
                     }
                 }
-            } else if (!isSearchingAddress && !suppressMapSuggestions && addressText.trim().length >= 5) {
+            } else if (!isSearchingAddress && !suppressMapSuggestions && suggestions.isEmpty() && addressText.trim().length >= 5) {
                 // Nominatim's free OpenStreetMap data has much weaker
                 // coverage of businesses, care homes, schools etc. than
                 // Google's own database — a name search turning up nothing
                 // here doesn't mean Maps won't find it. Say so, rather than
                 // leaving it looking broken.
                 Text(
-                    "No suggestions for this one — that's OK, OpenStreetMap's free data doesn't have every business or care home. Google Maps probably still does; search for it below, or just finish typing the full name and address.",
+                    "Not in your favorites, and OpenStreetMap's free data doesn't have this one either. Google Maps probably still does — search for it below, or just finish typing the full name and address.",
                     color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f),
                 )
             }
 
-            if (addressText.trim().length >= 3) {
-                // Not satisfied with the suggestions above (wrong, or none
-                // at all)? Check the real thing in Google Maps itself —
-                // this just opens a place search there, the same as typing
-                // into Maps' own search bar, so you can see the actual
-                // listing and copy its exact wording back here by hand.
+            if (!isSearchingAddress && suggestions.isEmpty() && mapSuggestions.isEmpty() && addressText.trim().length >= 3) {
+                // Only offered once neither your own favorites/memory nor
+                // OpenStreetMap turned anything up — the last resort, not
+                // the first thing shown. Opens a plain Maps search (not
+                // directions) for whatever's typed so far, so you can see
+                // the actual listing and copy its exact wording back here.
                 OutlinedButton(
                     onClick = { MapsLauncher.openSearch(context, addressText) },
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Icon(Icons.Filled.Search, contentDescription = null)
-                    Text("  Not right? Search in Google Maps")
+                    Text("  Not found — search in Google Maps")
                 }
             }
 
@@ -384,36 +423,6 @@ fun AddEditAddressScreen(
                     ) {
                         Icon(Icons.Filled.Star, contentDescription = null)
                         Text("  Save as favorite — one-tap add next time")
-                    }
-                }
-            }
-
-            if (suggestions.isNotEmpty()) {
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(
-                        "From memory:",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
-                    )
-                    suggestions.forEach { suggestion ->
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(MaterialTheme.colorScheme.surface)
-                                .clickable { applySuggestion(suggestion) }
-                                .padding(12.dp),
-                        ) {
-                            Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                                Icon(
-                                    Icons.Filled.History,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(suggestion.displayLabel, color = MaterialTheme.colorScheme.onSurface)
-                            }
-                        }
                     }
                 }
             }

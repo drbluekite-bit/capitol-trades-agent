@@ -138,6 +138,31 @@ or background service.
   whatever's typed so far, to check the real listing and copy its wording
   back in by hand. This never blocks adding the stop either way, since
   the typed text is what gets geocoded at journey time regardless.
+  What's checked, in order, as you type: **your own favorites/memory
+  first** (instant, no network, and the one source that's actually
+  yours), **then** OpenStreetMap, and only once both are empty is
+  "Search in Google Maps" offered — the last resort, not the first thing
+  you see.
+- **Why not just use Google's own search/Places data for the dropdown
+  itself, instead of free OpenStreetMap data?** Fair question for a
+  personal app — there's no *technical* reason this app *couldn't*. The
+  reason it doesn't is that Google's Places API (the only way to get
+  Google's own search results rendered inside an app's own UI, rather
+  than by opening the Maps app) requires creating a Google Cloud project
+  with **billing enabled** — a card on file — before it will even issue
+  a working API key, regardless of whether real usage stays inside
+  Google's monthly free credit (which, for how lightly a personal app
+  like this gets used, it almost certainly would — realistically £0/
+  month, same as this app's what3words key has cost nothing so far).
+  That's a materially bigger ask than "paste a free API key into
+  Settings" (what3words) or "no account at all" (OpenStreetMap, Google
+  Maps/Waze's own deep links) — it needs an actual Google Cloud
+  Console project set up and a payment method attached by you, the
+  account holder, not something this app can do on your behalf. If
+  that trade-off is worth it to you for a noticeably better in-app
+  search, it's a buildable follow-up: create the Cloud project, enable
+  the Places API, attach billing, generate a key, and the same
+  Settings-screen pattern used for what3words can hold it.
 - **what3words is optional and needs your own free API key.** A
   `///three.word.address` means nothing to Google Maps's geocoder — so if
   you want a what3words-only stop included in the *same* multi-stop
