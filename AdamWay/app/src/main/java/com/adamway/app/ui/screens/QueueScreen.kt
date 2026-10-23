@@ -3,15 +3,18 @@ package com.adamway.app.ui.screens
 import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.DeleteSweep
-import androidx.compose.material.icons.filled.Store
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -29,18 +32,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.adamway.app.data.AddressRepository
+import com.adamway.app.data.SavedAddress
 import com.adamway.app.ui.components.AddressCard
 import com.adamway.app.ui.components.ConfirmDialog
 import com.adamway.app.viewmodel.AddressViewModel
-
-/** A one-tap favorite destination, so a regular stop never needs retyping. */
-private data class QuickAddLocation(val label: String, val addressText: String)
-
-private val QUICK_ADD_LOCATIONS = listOf(
-    QuickAddLocation("Tesco Extra, Barnsley", "Tesco Extra, Wombwell Lane, Barnsley S70 3NS"),
-)
 
 @Composable
 fun QueueScreen(
@@ -52,6 +50,7 @@ fun QueueScreen(
 ) {
     val context = LocalContext.current
     val queue by addressViewModel.queue.collectAsState()
+    val favorites by addressViewModel.favorites.collectAsState()
     var showClearConfirm by remember { mutableStateOf(false) }
 
     if (showClearConfirm) {
@@ -98,7 +97,7 @@ fun QueueScreen(
             }
         },
     ) { padding ->
-        fun quickAdd(location: QuickAddLocation) {
+        fun quickAdd(favorite: SavedAddress) {
             if (queue.size >= AddressRepository.MAX_QUEUE_SIZE) {
                 Toast.makeText(
                     context,
@@ -106,37 +105,40 @@ fun QueueScreen(
                     Toast.LENGTH_LONG,
                 ).show()
             } else {
-                addressViewModel.quickAdd(location.addressText)
+                addressViewModel.quickAdd(favorite.addressText, favorite.what3words)
             }
         }
 
-        if (queue.isEmpty()) {
-            Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                Text(
-                    "No addresses yet.\nTap + to add your first stop.",
-                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                )
-            }
-        } else {
-            androidx.compose.foundation.layout.Column(modifier = Modifier.fillMaxSize().padding(padding)) {
-                androidx.compose.foundation.lazy.LazyRow(
+        Column(modifier = Modifier.fillMaxSize().padding(padding)) {
+            if (favorites.isNotEmpty()) {
+                LazyRow(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    items(QUICK_ADD_LOCATIONS.size) { i ->
-                        val location = QUICK_ADD_LOCATIONS[i]
+                    items(favorites.size) { i ->
+                        val favorite = favorites[i]
                         AssistChip(
-                            onClick = { quickAdd(location) },
-                            label = { Text(location.label) },
-                            leadingIcon = { Icon(Icons.Filled.Store, contentDescription = null) },
+                            onClick = { quickAdd(favorite) },
+                            label = { Text(favorite.favoriteLabel.orEmpty()) },
+                            leadingIcon = { Icon(Icons.Filled.Star, contentDescription = null) },
                         )
                     }
                 }
+            }
+
+            if (queue.isEmpty()) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text(
+                        "No addresses yet.\nTap + to add your first stop.",
+                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
+                        textAlign = TextAlign.Center,
+                    )
+                }
+            } else {
                 LazyColumn(
                     modifier = Modifier.fillMaxWidth().weight(1f).padding(horizontal = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp),
-                    contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = 8.dp),
+                    contentPadding = PaddingValues(vertical = 8.dp),
                 ) {
                     items(queue.size) { index ->
                         val address = queue[index]

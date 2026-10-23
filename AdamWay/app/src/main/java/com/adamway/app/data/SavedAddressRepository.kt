@@ -7,6 +7,9 @@ class SavedAddressRepository(private val dao: SavedAddressDao) {
 
     fun observeAll(): Flow<List<SavedAddress>> = dao.observeAll()
 
+    /** Addresses you've named for one-tap Quick Add, alphabetical by that name. */
+    fun observeFavorites(): Flow<List<SavedAddress>> = dao.observeFavorites()
+
     suspend fun getById(id: Long): SavedAddress? = dao.getById(id)
 
     /** Up to 5 addresses from memory whose details loosely match [query], most recently used first. */
@@ -41,6 +44,12 @@ class SavedAddressRepository(private val dao: SavedAddressDao) {
     suspend fun syncCoreFields(id: Long, addressText: String, what3words: String) {
         val existing = dao.getById(id) ?: return
         dao.upsert(existing.copy(addressText = addressText.trim(), what3words = what3words.trim()))
+    }
+
+    /** Sets or clears (pass null/blank) the Quick Add name for an existing memory entry. */
+    suspend fun setFavoriteLabel(id: Long, label: String?) {
+        val existing = dao.getById(id) ?: return
+        dao.upsert(existing.copy(favoriteLabel = label?.trim()?.takeIf { it.isNotBlank() }))
     }
 
     suspend fun updateNotes(id: Long, notes: String, photoPaths: List<String>) {

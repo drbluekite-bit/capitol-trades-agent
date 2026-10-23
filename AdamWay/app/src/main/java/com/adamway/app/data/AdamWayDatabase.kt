@@ -5,7 +5,7 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 
-@Database(entities = [Address::class, SavedAddress::class], version = 4, exportSchema = false)
+@Database(entities = [Address::class, SavedAddress::class], version = 5, exportSchema = false)
 abstract class AdamWayDatabase : RoomDatabase() {
     abstract fun addressDao(): AddressDao
     abstract fun savedAddressDao(): SavedAddressDao

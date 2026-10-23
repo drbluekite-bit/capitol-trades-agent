@@ -1,6 +1,9 @@
 package com.adamway.app.ui.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -42,6 +45,17 @@ fun AdamWayNavHost(navController: NavHostController = rememberNavController()) {
     val journeyViewModel: JourneyViewModel = viewModel(factory = factory)
     val settingsViewModel: SettingsViewModel = viewModel(factory = factory)
     val savedAddressViewModel: SavedAddressViewModel = viewModel(factory = factory)
+
+    // A place shared in from another app (Google Maps' Share button)
+    // lands on [AdamWayApplication.pendingShare]; route straight to the
+    // Add/Edit screen with it, from wherever the user currently is.
+    val pendingShare by app.pendingShare.collectAsState()
+    LaunchedEffect(pendingShare) {
+        val share = pendingShare ?: return@LaunchedEffect
+        addressViewModel.startEditingFromShare(share.addressText, share.suggestedLabel)
+        navController.navigate(Routes.ADD_EDIT)
+        app.pendingShare.value = null
+    }
 
     NavHost(navController = navController, startDestination = Routes.HOME) {
         composable(Routes.HOME) {

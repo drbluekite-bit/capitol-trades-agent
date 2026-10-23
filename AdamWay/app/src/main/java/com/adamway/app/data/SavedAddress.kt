@@ -18,6 +18,12 @@ data class SavedAddress(
     val notes: String = "",
     /** Local file paths of photos attached to this address's notes, [PHOTO_PATH_DELIMITER]-separated. */
     val notePhotoPaths: String = "",
+    /**
+     * A name you gave this place so it can be added with a single tap from
+     * the Queue screen — "Thornhill House", a school run, etc. Null/blank
+     * means this is just an ordinary remembered address, not a favorite.
+     */
+    val favoriteLabel: String? = null,
     val lastUsedAt: Long = System.currentTimeMillis(),
 ) {
     val photoPathList: List<String>

@@ -12,6 +12,9 @@ interface SavedAddressDao {
     @Query("SELECT * FROM saved_addresses ORDER BY lastUsedAt DESC")
     fun observeAll(): Flow<List<SavedAddress>>
 
+    @Query("SELECT * FROM saved_addresses WHERE favoriteLabel IS NOT NULL AND favoriteLabel != '' ORDER BY favoriteLabel COLLATE NOCASE ASC")
+    fun observeFavorites(): Flow<List<SavedAddress>>
+
     @Query("SELECT * FROM saved_addresses")
     suspend fun getAll(): List<SavedAddress>
 

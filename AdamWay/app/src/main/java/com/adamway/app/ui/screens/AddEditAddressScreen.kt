@@ -25,11 +25,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -79,6 +81,13 @@ fun AddEditAddressScreen(
     var mapSuggestions by remember { mutableStateOf<List<String>>(emptyList()) }
     var isSearchingAddress by remember { mutableStateOf(false) }
     var suppressMapSuggestions by remember(editing) { mutableStateOf(false) }
+
+    // "Save as favorite" — a one-tap Quick Add chip on the Queue screen,
+    // under a name you give it. Separate from adding this to today's
+    // queue, since you might be saving a place (a school, a care home)
+    // well before you actually need it on a journey.
+    var showFavoriteNameField by remember { mutableStateOf(false) }
+    var favoriteLabel by remember { mutableStateOf("") }
 
     var showCamera by remember { mutableStateOf(false) }
 
@@ -130,6 +139,22 @@ fun AddEditAddressScreen(
             mapSuggestions = addressViewModel.searchAddressSuggestions(addressText)
             isSearchingAddress = false
         }
+    }
+
+    // A place shared in from another app (Google Maps' Share button) lands
+    // here once, pre-filling the address and opening the favorite-name
+    // field with a suggested name — consumed immediately so it doesn't
+    // resurface on a later, unrelated "Add address" visit.
+    val sharePrefill by addressViewModel.sharePrefill.collectAsState()
+    LaunchedEffect(sharePrefill) {
+        val prefill = sharePrefill ?: return@LaunchedEffect
+        if (editing == null) {
+            addressText = prefill.addressText
+            favoriteLabel = prefill.suggestedLabel
+            showFavoriteNameField = true
+            suppressMapSuggestions = false
+        }
+        addressViewModel.clearSharePrefill()
     }
 
     var hasCameraPermission by remember {
@@ -324,6 +349,44 @@ fun AddEditAddressScreen(
                 singleLine = true,
                 prefix = { Text("///") },
             )
+
+            if (addressText.isNotBlank() || what3words.isNotBlank()) {
+                if (showFavoriteNameField) {
+                    Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                        OutlinedTextField(
+                            value = favoriteLabel,
+                            onValueChange = { favoriteLabel = it },
+                            label = { Text("Favorite name") },
+                            placeholder = { Text("e.g. Thornhill House") },
+                            modifier = Modifier.weight(1f),
+                            singleLine = true,
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        IconButton(
+                            onClick = {
+                                if (favoriteLabel.isBlank()) {
+                                    Toast.makeText(context, "Give it a name first", Toast.LENGTH_SHORT).show()
+                                } else {
+                                    addressViewModel.saveFavorite(addressText, what3words, favoriteLabel)
+                                    Toast.makeText(context, "Saved \"$favoriteLabel\" as a favorite", Toast.LENGTH_SHORT).show()
+                                    showFavoriteNameField = false
+                                    favoriteLabel = ""
+                                }
+                            },
+                        ) {
+                            Icon(Icons.Filled.Check, contentDescription = "Confirm favorite name")
+                        }
+                    }
+                } else {
+                    OutlinedButton(
+                        onClick = { showFavoriteNameField = true },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Icon(Icons.Filled.Star, contentDescription = null)
+                        Text("  Save as favorite — one-tap add next time")
+                    }
+                }
+            }
 
             if (suggestions.isNotEmpty()) {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {

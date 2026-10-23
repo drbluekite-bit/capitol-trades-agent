@@ -48,12 +48,28 @@ picker tops out at around 10. Black background, white "AW" logo.
    (parking instructions, a gate code, which door to use, etc.). These are
    attached to the address in memory, not just this one trip, so they're
    still there next time it comes up.
-7. **Quick add** chips on the Queue screen let you add a favorite
-   destination in one tap, without opening the form at all — currently
-   just "Tesco Extra, Barnsley". It's added to the end of the queue like
-   any other stop, so add it last (or reorder it down) if you want it as
+7. **Favorites — named places you add with one tap, no form.** On the
+   Add/Edit screen, tap **Save as favorite**, give the place a name (e.g.
+   "Thornhill House"), and it shows up from then on as a chip at the top
+   of the Queue screen — tap the chip to add it to today's queue instantly.
+   Saving a favorite is separate from adding it to the queue right now, so
+   you can catalogue a school or a care home well before you actually need
+   it on a journey. New stops are added to the end of the queue like any
+   other, so add a favorite last (or reorder it down) if you want it as
    your final destination.
-8. **Every stop listed in the journey screen shows its full address line**
+8. **Find it in Google Maps, share it straight into Adam Way.** Maps'
+   own search/POI data covers far more businesses, schools, and care homes
+   than the free data this app's own suggestions use (see below). So: find
+   the place in Maps (the in-app **"Search in Google Maps"** button gets
+   you there), tap Maps' own **Share** button on it, and pick **Adam Way**
+   from the share sheet. Adam Way opens straight to the Add/Edit screen
+   with the place's name pre-filled and ready to save as a favorite — Maps'
+   Share action only hands over the name and a link, not the full postal
+   address, so you'll likely still need to add the street and postcode
+   yourself the first time (the same copy-from-Maps-paste-here approach
+   works, or just type it) — but only that once; from then on it's the
+   one-tap favorite chip.
+9. **Every stop listed in the journey screen shows its full address line**
    (including the postcode, if you included one when typing/picking it) —
    there's no separate short label that drops detail; what you typed or
    picked is exactly what's shown at every stage, overview included.
@@ -127,6 +143,17 @@ or background service.
   [developer.what3words.com](https://developer.what3words.com). Add it in
   Settings. Without a key, a what3words-only stop instead opens directly
   in the What3Words app when it's your next stop.
+- **Why Share, not a direct "import from Maps" button.** The natural ask
+  was: find it in Maps, pull the whole thing — name, full address,
+  postcode — straight into Adam Way. That's not something a free app can
+  do reliably: Maps' own Share action only ever hands over a place's name
+  and a short link, not its full postal address, and getting the rest
+  (resolving the link, or querying a place by ID) means Google's paid
+  Places API — exactly the kind of account/billing dependency this app
+  has avoided throughout. So favorites still need the street/postcode
+  added by hand the first time a place is saved — but that's a one-off
+  cost per place, not a recurring one, and it's still a real improvement
+  over retyping (or re-finding) the same address every time.
 - **Choosing Google Maps or Waze per stop.** The whole multi-stop journey
   always goes through Google Maps, since Waze's own deep link scheme
   doesn't support multiple waypoints at all — there's no way to hand it an
@@ -149,6 +176,10 @@ or background service.
   **on-device, bundled** ML Kit text recognizer (the model ships inside
   the app — no network call, nothing sent to Google), and then discarded.
   Nothing is written to disk or shared.
+- Adam Way appears in Android's Share sheet (so Maps' own "Share" button
+  can hand you a place) via a plain `text/plain` share intent-filter — no
+  new permission, and nothing is sent anywhere by this: the shared text
+  only ever goes from the OS into this app's own Add/Edit screen.
 - **Speak address** launches the phone's own system speech-to-text app
   (via `RecognizerIntent`) rather than Adam Way doing any recording or
   recognition itself — the same thing your keyboard's microphone button
