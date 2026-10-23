@@ -14,7 +14,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.DeleteSweep
-import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Store
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -35,10 +35,22 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.adamway.app.data.AddressRepository
-import com.adamway.app.data.SavedAddress
 import com.adamway.app.ui.components.AddressCard
 import com.adamway.app.ui.components.ConfirmDialog
+import com.adamway.app.ui.components.FavoritesQuickAdd
 import com.adamway.app.viewmodel.AddressViewModel
+
+/**
+ * A permanent, always-first shortcut — separate from the general
+ * Favorites list, which can grow long and gets alphabetically grouped.
+ * This is the one place worth never having to look for. Add more entries
+ * here directly if you want further permanent shortcuts of your own.
+ */
+private data class QuickAddLocation(val label: String, val addressText: String)
+
+private val QUICK_ADD_LOCATIONS = listOf(
+    QuickAddLocation("Tesco Extra, Barnsley", "Tesco Extra, Wombwell Lane, Barnsley S70 3NS"),
+)
 
 @Composable
 fun QueueScreen(
@@ -97,7 +109,7 @@ fun QueueScreen(
             }
         },
     ) { padding ->
-        fun quickAdd(favorite: SavedAddress) {
+        fun quickAddFull(addressText: String, what3words: String = "") {
             if (queue.size >= AddressRepository.MAX_QUEUE_SIZE) {
                 Toast.makeText(
                     context,
@@ -105,25 +117,33 @@ fun QueueScreen(
                     Toast.LENGTH_LONG,
                 ).show()
             } else {
-                addressViewModel.quickAdd(favorite.addressText, favorite.what3words)
+                addressViewModel.quickAdd(addressText, what3words)
             }
         }
 
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
-            if (favorites.isNotEmpty()) {
+            if (QUICK_ADD_LOCATIONS.isNotEmpty()) {
                 LazyRow(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    items(favorites.size) { i ->
-                        val favorite = favorites[i]
+                    items(QUICK_ADD_LOCATIONS.size) { i ->
+                        val location = QUICK_ADD_LOCATIONS[i]
                         AssistChip(
-                            onClick = { quickAdd(favorite) },
-                            label = { Text(favorite.favoriteLabel.orEmpty()) },
-                            leadingIcon = { Icon(Icons.Filled.Star, contentDescription = null) },
+                            onClick = { quickAddFull(location.addressText) },
+                            label = { Text(location.label) },
+                            leadingIcon = { Icon(Icons.Filled.Store, contentDescription = null) },
                         )
                     }
                 }
+            }
+
+            if (favorites.isNotEmpty()) {
+                FavoritesQuickAdd(
+                    favorites = favorites,
+                    onQuickAdd = { quickAddFull(it.addressText, it.what3words) },
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                )
             }
 
             if (queue.isEmpty()) {

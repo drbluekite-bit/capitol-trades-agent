@@ -8,11 +8,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -38,6 +35,7 @@ import com.adamway.app.data.AddressRepository
 import com.adamway.app.data.SavedAddress
 import com.adamway.app.ui.components.AdamWayLogo
 import com.adamway.app.ui.components.ConfirmDialog
+import com.adamway.app.ui.components.FavoritesQuickAdd
 import com.adamway.app.viewmodel.AddressViewModel
 
 @Composable
@@ -112,24 +110,11 @@ fun HomeScreen(
 
             if (favorites.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(24.dp))
-                Text(
-                    "Favorites — tap to add:",
-                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                LazyRow(
+                FavoritesQuickAdd(
+                    favorites = favorites,
+                    onQuickAdd = { quickAdd(it) },
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    items(favorites.size) { i ->
-                        val favorite = favorites[i]
-                        AssistChip(
-                            onClick = { quickAdd(favorite) },
-                            label = { Text(favorite.favoriteLabel.orEmpty()) },
-                            leadingIcon = { Icon(Icons.Filled.Star, contentDescription = null) },
-                        )
-                    }
-                }
+                )
             }
 
             Spacer(modifier = Modifier.height(48.dp))

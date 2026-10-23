@@ -58,8 +58,19 @@ picker tops out at around 10. Black background, white "AW" logo.
    the queue right now, so you can catalogue a school or a care home well
    before you actually need it on a journey. New stops are added to the
    end of the queue like any other, so add a favorite last (or reorder it
-   down) if you want it as your final destination.
-8. **Find it in Google Maps, share it straight into Adam Way.** Maps'
+   down) if you want it as your final destination. Once there are more
+   than a handful, an **A–Z group filter** (A–E, F–J, K–O, P–T, U–Z)
+   appears above the chips on both screens — tap a group to narrow the
+   list to favorites whose name starts with one of its letters, tap it
+   again to see all of them.
+8. **The Queue screen also has one permanent shortcut of its own**,
+   separate from Favorites — currently "Tesco Extra, Barnsley". Unlike a
+   favorite, it isn't managed from the app; it's defined directly in
+   `QueueScreen.kt` (`QUICK_ADD_LOCATIONS`), for the one place worth never
+   having to look for even as the rest of your favorites list grows and
+   gets reorganised. Add more entries there if you want further permanent
+   shortcuts of your own.
+9. **Find it in Google Maps, share it straight into Adam Way.** Maps'
    own search/POI data covers far more businesses, schools, and care homes
    than the free data this app's own suggestions use (see below). So: find
    the place in Maps (the in-app **"Search in Google Maps"** button gets
@@ -73,7 +84,7 @@ picker tops out at around 10. Black background, white "AW" logo.
    and postcode yourself the first time (the same copy-from-Maps-paste-here
    approach works, or just type it) — but only that once; from then on
    it's the one-tap favorite chip.
-9. **Every stop listed in the journey screen shows its full address line**
+10. **Every stop listed in the journey screen shows its full address line**
    (including the postcode, if you included one when typing/picking it) —
    there's no separate short label that drops detail; what you typed or
    picked is exactly what's shown at every stage, overview included.
