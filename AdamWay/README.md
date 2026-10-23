@@ -58,11 +58,10 @@ picker tops out at around 10. Black background, white "AW" logo.
    the queue right now, so you can catalogue a school or a care home well
    before you actually need it on a journey. New stops are added to the
    end of the queue like any other, so add a favorite last (or reorder it
-   down) if you want it as your final destination. Once there are more
-   than a handful, an **A–Z group filter** (A–E, F–J, K–O, P–T, U–Z)
-   appears above the chips on both screens — tap a group to narrow the
-   list to favorites whose name starts with one of its letters, tap it
-   again to see all of them.
+   down) if you want it as your final destination. An **A–Z group filter**
+   (A–E, F–J, K–O, P–T, U–Z) always sits above the chips on both screens —
+   tap a group to narrow the list to favorites whose name starts with one
+   of its letters, tap it again to see all of them.
 8. **The Queue screen also has one permanent shortcut of its own**,
    separate from Favorites — currently "Tesco Extra, Barnsley". Unlike a
    favorite, it isn't managed from the app; it's defined directly in
@@ -83,7 +82,12 @@ picker tops out at around 10. Black background, white "AW" logo.
    the full postal address, so you'll likely still need to add the street
    and postcode yourself the first time (the same copy-from-Maps-paste-here
    approach works, or just type it) — but only that once; from then on
-   it's the one-tap favorite chip.
+   it's the one-tap favorite chip. This can't be tested from the authoring
+   sandbox (no way to simulate a real device's share sheet there), so a
+   toast confirms what Adam Way actually received every time a share
+   arrives — "opening ... as a new favorite" on success, or what went
+   wrong (no usable text, with the MIME type Android reported) if it
+   didn't land. Temporary, until this is solid.
 10. **Every stop listed in the journey screen shows its full address line**
    (including the postcode, if you included one when typing/picking it) —
    there's no separate short label that drops detail; what you typed or

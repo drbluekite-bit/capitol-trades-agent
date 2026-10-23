@@ -33,11 +33,11 @@ private val LETTER_GROUPS = listOf(
 )
 
 /**
- * One-tap favorite chips, with an A–Z group filter above them once there's
- * enough favorites that a single row gets unwieldy to scan — tap a group
- * to narrow the chips to names starting with one of its letters, tap it
- * again to go back to showing all of them. Used identically from the Home
- * and Queue screens, so favorites are findable the same way from either.
+ * One-tap favorite chips, with an A–Z group filter always shown above them
+ * — tap a group to narrow the chips to names starting with one of its
+ * letters, tap it again to go back to showing all of them. Used
+ * identically from the Home and Queue screens, so favorites are findable
+ * the same way from either.
  */
 @Composable
 fun FavoritesQuickAdd(
@@ -56,22 +56,20 @@ fun FavoritesQuickAdd(
         )
         Spacer(modifier = Modifier.height(8.dp))
 
-        if (favorites.size > 5) {
-            LazyRow(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                items(LETTER_GROUPS.size) { i ->
-                    val group = LETTER_GROUPS[i]
-                    FilterChip(
-                        selected = selectedGroup == group.range,
-                        onClick = { selectedGroup = if (selectedGroup == group.range) null else group.range },
-                        label = { Text(group.label) },
-                    )
-                }
+        LazyRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            items(LETTER_GROUPS.size) { i ->
+                val group = LETTER_GROUPS[i]
+                FilterChip(
+                    selected = selectedGroup == group.range,
+                    onClick = { selectedGroup = if (selectedGroup == group.range) null else group.range },
+                    label = { Text(group.label) },
+                )
             }
-            Spacer(modifier = Modifier.height(8.dp))
         }
+        Spacer(modifier = Modifier.height(8.dp))
 
         val visible = favorites.filter { favorite ->
             val range = selectedGroup ?: return@filter true
