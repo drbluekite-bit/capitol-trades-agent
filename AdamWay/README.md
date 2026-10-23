@@ -50,25 +50,29 @@ picker tops out at around 10. Black background, white "AW" logo.
    still there next time it comes up.
 7. **Favorites — named places you add with one tap, no form.** On the
    Add/Edit screen, tap **Save as favorite**, give the place a name (e.g.
-   "Thornhill House"), and it shows up from then on as a chip at the top
-   of the Queue screen — tap the chip to add it to today's queue instantly.
-   Saving a favorite is separate from adding it to the queue right now, so
-   you can catalogue a school or a care home well before you actually need
-   it on a journey. New stops are added to the end of the queue like any
-   other, so add a favorite last (or reorder it down) if you want it as
-   your final destination.
+   "Thornhill House"), and confirm it either with the small checkmark next
+   to the name field or by just tapping **Add to queue**/**Save changes** —
+   both now save it. It then shows up as a chip both on the **Home screen**
+   and at the top of the **Queue screen** — tap the chip to add it to
+   today's queue instantly. Saving a favorite is separate from adding it to
+   the queue right now, so you can catalogue a school or a care home well
+   before you actually need it on a journey. New stops are added to the
+   end of the queue like any other, so add a favorite last (or reorder it
+   down) if you want it as your final destination.
 8. **Find it in Google Maps, share it straight into Adam Way.** Maps'
    own search/POI data covers far more businesses, schools, and care homes
    than the free data this app's own suggestions use (see below). So: find
    the place in Maps (the in-app **"Search in Google Maps"** button gets
    you there), tap Maps' own **Share** button on it, and pick **Adam Way**
-   from the share sheet. Adam Way opens straight to the Add/Edit screen
-   with the place's name pre-filled and ready to save as a favorite — Maps'
-   Share action only hands over the name and a link, not the full postal
-   address, so you'll likely still need to add the street and postcode
-   yourself the first time (the same copy-from-Maps-paste-here approach
-   works, or just type it) — but only that once; from then on it's the
-   one-tap favorite chip.
+   from the share sheet — if it isn't in the row of quick suggestions
+   Android shows first, tap **More**/scroll down to see every app that can
+   receive a share, Adam Way included. Adam Way opens straight to the
+   Add/Edit screen with the place's name pre-filled and ready to save as a
+   favorite — Maps' Share action only hands over the name and a link, not
+   the full postal address, so you'll likely still need to add the street
+   and postcode yourself the first time (the same copy-from-Maps-paste-here
+   approach works, or just type it) — but only that once; from then on
+   it's the one-tap favorite chip.
 9. **Every stop listed in the journey screen shows its full address line**
    (including the postcode, if you included one when typing/picking it) —
    there's no separate short label that drops detail; what you typed or

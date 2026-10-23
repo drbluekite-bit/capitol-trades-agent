@@ -1,5 +1,6 @@
 package com.adamway.app.ui.screens
 
+import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -7,8 +8,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -27,9 +31,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.adamway.app.data.AddressRepository
+import com.adamway.app.data.SavedAddress
 import com.adamway.app.ui.components.AdamWayLogo
 import com.adamway.app.ui.components.ConfirmDialog
 import com.adamway.app.viewmodel.AddressViewModel
@@ -41,8 +47,22 @@ fun HomeScreen(
     onBeginJourney: () -> Unit,
     onOpenSettings: () -> Unit,
 ) {
+    val context = LocalContext.current
     val queue by addressViewModel.queue.collectAsState()
+    val favorites by addressViewModel.favorites.collectAsState()
     var showClearConfirm by remember { mutableStateOf(false) }
+
+    fun quickAdd(favorite: SavedAddress) {
+        if (queue.size >= AddressRepository.MAX_QUEUE_SIZE) {
+            Toast.makeText(
+                context,
+                "Queue is full (${AddressRepository.MAX_QUEUE_SIZE} max) — remove a stop first",
+                Toast.LENGTH_LONG,
+            ).show()
+        } else {
+            addressViewModel.quickAdd(favorite.addressText, favorite.what3words)
+        }
+    }
 
     if (showClearConfirm) {
         ConfirmDialog(
@@ -89,6 +109,29 @@ fun HomeScreen(
                 "${queue.size} / ${AddressRepository.MAX_QUEUE_SIZE} stops queued",
                 color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
             )
+
+            if (favorites.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(24.dp))
+                Text(
+                    "Favorites — tap to add:",
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                LazyRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    items(favorites.size) { i ->
+                        val favorite = favorites[i]
+                        AssistChip(
+                            onClick = { quickAdd(favorite) },
+                            label = { Text(favorite.favoriteLabel.orEmpty()) },
+                            leadingIcon = { Icon(Icons.Filled.Star, contentDescription = null) },
+                        )
+                    }
+                }
+            }
+
             Spacer(modifier = Modifier.height(48.dp))
 
             Button(

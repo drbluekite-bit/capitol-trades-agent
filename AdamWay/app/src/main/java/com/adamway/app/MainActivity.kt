@@ -46,8 +46,15 @@ class MainActivity : ComponentActivity() {
      * OpenStreetMap data this app's own address suggestions use.
      */
     private fun handleShareIntent(intent: Intent) {
-        if (intent.action != Intent.ACTION_SEND || intent.type != "text/plain") return
-        val shared = intent.getStringExtra(Intent.EXTRA_TEXT)?.trim().orEmpty()
+        // A loose startsWith rather than an exact "text/plain" match: some
+        // apps' share implementations append a charset or other parameter
+        // to the MIME type (e.g. "text/plain; charset=UTF-8"), which an
+        // exact equality check would silently reject even though the
+        // manifest's own intent-filter matching (which got Adam Way into
+        // the share sheet in the first place) is more lenient about it.
+        if (intent.action != Intent.ACTION_SEND || intent.type?.startsWith("text/plain") != true) return
+        val shared = (intent.getStringExtra(Intent.EXTRA_TEXT) ?: intent.getStringExtra(Intent.EXTRA_SUBJECT))
+            ?.trim().orEmpty()
         if (shared.isBlank()) return
 
         // Google Maps' share text is typically "Place Name\nhttps://maps.app.goo.gl/xxxx"

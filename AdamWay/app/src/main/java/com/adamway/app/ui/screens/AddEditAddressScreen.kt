@@ -420,6 +420,16 @@ fun AddEditAddressScreen(
 
             Button(
                 onClick = {
+                    // Typing a name into the favorite field and then
+                    // tapping this button (the natural next action) rather
+                    // than the small checkmark next to that field used to
+                    // silently lose the favorite — it only ever got saved
+                    // from the checkmark's own onClick. Now either path
+                    // saves it.
+                    if (showFavoriteNameField && favoriteLabel.isNotBlank()) {
+                        addressViewModel.saveFavorite(addressText, what3words, favoriteLabel)
+                        Toast.makeText(context, "Saved \"$favoriteLabel\" as a favorite", Toast.LENGTH_SHORT).show()
+                    }
                     val current = editing
                     if (current == null) {
                         addressViewModel.addAddress(addressText, what3words, selectedSavedAddressId)
