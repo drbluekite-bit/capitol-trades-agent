@@ -92,6 +92,22 @@ picker tops out at around 10. Black background, white "AW" logo.
    (including the postcode, if you included one when typing/picking it) —
    there's no separate short label that drops detail; what you typed or
    picked is exactly what's shown at every stage, overview included.
+11. **Scan a whole delivery run from photographed delivery sheets**, tap
+    the camera icon on the Queue screen. Photograph each sheet one at a
+    time — this is built around one specific, fixed template (two
+    deliveries per printed page, a delivery number, an address, and
+    Delivery Instructions/CDA Notes boxes), not a generic document
+    scanner, so it only works well on sheets that actually look like
+    that. Keep going through as many sheets as the run has, then tap
+    **Done** to review: every delivery found, sorted **highest delivery
+    number first, lowest last** (the real drop order — first off the
+    van to last), each one editable and removable before anything
+    touches the real queue. The parser is making a best-effort guess at
+    what's on each sheet — it is not meant to be trusted blindly, which
+    is exactly why this review step exists; check every row, especially
+    on a creased or badly-lit photo. Delivery Instructions and CDA
+    Notes both get attached to that address's notes. Confirming adds
+    the whole run to the queue in order, in one go.
 
 ## Why "Arrived – Next Stop" is a button, not automatic
 
@@ -178,6 +194,20 @@ or background service.
   search, it's a buildable follow-up: create the Cloud project, enable
   the Places API, attach billing, generate a key, and the same
   Settings-screen pattern used for what3words can hold it.
+- **Delivery-sheet scanning is a fixed-template parser, not a document
+  reader.** It doesn't try to understand an arbitrary photo — it looks for
+  one specific layout (anchoring on literal section labels, a UK postcode
+  to find the address box, and the delivery number being the largest
+  bare-digit text in its corner), because that's what makes free, on-device
+  OCR workable at all for something this specific. A generic "read any
+  table" version would need either a much more capable (and much less
+  reliable, for this kind of document) local heuristic, or a paid
+  cloud/LLM vision service — the same account/billing trade-off as the
+  Places API question above. Since the sheets this was built for are
+  printed and follow one consistent layout, the fixed-template approach
+  was the better trade for now. Every row it produces is a guess meant to
+  be checked on the review screen, never trusted outright — the same
+  principle behind every other automatic-resolution feature in this app.
 - **what3words is optional and needs your own free API key.** A
   `///three.word.address` means nothing to Google Maps's geocoder — so if
   you want a what3words-only stop included in the *same* multi-stop
@@ -219,7 +249,10 @@ or background service.
 - Camera photos are decoded straight into memory, run through Google's
   **on-device, bundled** ML Kit text recognizer (the model ships inside
   the app — no network call, nothing sent to Google), and then discarded.
-  Nothing is written to disk or shared.
+  Nothing is written to disk or shared. This applies the same way when
+  scanning a whole delivery run: each sheet is processed and discarded as
+  soon as it's photographed, never kept around, even across a multi-photo
+  scanning session.
 - Adam Way appears in Android's Share sheet (so Maps' own "Share" button
   can hand you a place) via a plain `text/plain` share intent-filter — no
   new permission, and nothing is sent anywhere by this: the shared text

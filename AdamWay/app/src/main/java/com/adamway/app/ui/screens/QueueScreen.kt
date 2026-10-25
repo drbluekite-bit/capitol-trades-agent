@@ -1,6 +1,10 @@
 package com.adamway.app.ui.screens
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,6 +18,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.DeleteSweep
+import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Store
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.FloatingActionButton
@@ -34,6 +39,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import com.adamway.app.data.AddressRepository
 import com.adamway.app.ui.components.AddressCard
 import com.adamway.app.ui.components.ConfirmDialog
@@ -59,11 +65,20 @@ fun QueueScreen(
     onAddAddress: () -> Unit,
     onEditAddress: () -> Unit,
     onOpenNotes: (Long) -> Unit,
+    onScanDeliveryRun: () -> Unit,
 ) {
     val context = LocalContext.current
     val queue by addressViewModel.queue.collectAsState()
     val favorites by addressViewModel.favorites.collectAsState()
     var showClearConfirm by remember { mutableStateOf(false) }
+
+    var hasCameraPermission by remember {
+        mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED)
+    }
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        hasCameraPermission = granted
+        if (granted) onScanDeliveryRun()
+    }
 
     if (showClearConfirm) {
         ConfirmDialog(
@@ -89,6 +104,13 @@ fun QueueScreen(
                     }
                 },
                 actions = {
+                    IconButton(
+                        onClick = {
+                            if (hasCameraPermission) onScanDeliveryRun() else cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                        },
+                    ) {
+                        Icon(Icons.Filled.PhotoCamera, contentDescription = "Scan delivery run", tint = MaterialTheme.colorScheme.onBackground)
+                    }
                     if (queue.isNotEmpty()) {
                         IconButton(onClick = { showClearConfirm = true }) {
                             Icon(Icons.Filled.DeleteSweep, contentDescription = "Clear queue", tint = MaterialTheme.colorScheme.onBackground)

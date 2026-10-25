@@ -16,12 +16,15 @@ import androidx.navigation.navArgument
 import com.adamway.app.AdamWayApplication
 import com.adamway.app.ui.screens.AddEditAddressScreen
 import com.adamway.app.ui.screens.AddressNotesScreen
+import com.adamway.app.ui.screens.BatchScanScreen
 import com.adamway.app.ui.screens.HomeScreen
 import com.adamway.app.ui.screens.JourneyScreen
 import com.adamway.app.ui.screens.QueueScreen
+import com.adamway.app.ui.screens.ReviewRunScreen
 import com.adamway.app.ui.screens.SettingsScreen
 import com.adamway.app.viewmodel.AdamWayViewModelFactory
 import com.adamway.app.viewmodel.AddressViewModel
+import com.adamway.app.viewmodel.DeliveryRunViewModel
 import com.adamway.app.viewmodel.JourneyViewModel
 import com.adamway.app.viewmodel.SavedAddressViewModel
 import com.adamway.app.viewmodel.SettingsViewModel
@@ -34,6 +37,8 @@ private object Routes {
     const val SETTINGS = "settings"
     const val ADDRESS_NOTES = "address_notes"
     const val SAVED_ADDRESS_ID_ARG = "savedAddressId"
+    const val BATCH_SCAN = "batch_scan"
+    const val REVIEW_RUN = "review_run"
 }
 
 @Composable
@@ -45,6 +50,7 @@ fun AdamWayNavHost(navController: NavHostController = rememberNavController()) {
     val journeyViewModel: JourneyViewModel = viewModel(factory = factory)
     val settingsViewModel: SettingsViewModel = viewModel(factory = factory)
     val savedAddressViewModel: SavedAddressViewModel = viewModel(factory = factory)
+    val deliveryRunViewModel: DeliveryRunViewModel = viewModel(factory = factory)
 
     // A place shared in from another app (Google Maps' Share button)
     // lands on [AdamWayApplication.pendingShare]; route straight to the
@@ -75,12 +81,34 @@ fun AdamWayNavHost(navController: NavHostController = rememberNavController()) {
                 onOpenNotes = { savedAddressId ->
                     navController.navigate("${Routes.ADDRESS_NOTES}/$savedAddressId")
                 },
+                onScanDeliveryRun = { navController.navigate(Routes.BATCH_SCAN) },
             )
         }
         composable(Routes.ADD_EDIT) {
             AddEditAddressScreen(
                 addressViewModel = addressViewModel,
                 onDone = { navController.popBackStack() },
+            )
+        }
+        composable(Routes.BATCH_SCAN) {
+            BatchScanScreen(
+                deliveryRunViewModel = deliveryRunViewModel,
+                onDoneScanning = { navController.navigate(Routes.REVIEW_RUN) },
+                onCancel = {
+                    deliveryRunViewModel.reset()
+                    navController.popBackStack()
+                },
+            )
+        }
+        composable(Routes.REVIEW_RUN) {
+            ReviewRunScreen(
+                deliveryRunViewModel = deliveryRunViewModel,
+                onScanMore = { navController.navigate(Routes.BATCH_SCAN) },
+                onConfirmed = { navController.popBackStack(Routes.QUEUE, inclusive = false) },
+                onCancel = {
+                    deliveryRunViewModel.reset()
+                    navController.popBackStack(Routes.QUEUE, inclusive = false)
+                },
             )
         }
         composable(Routes.JOURNEY) {
