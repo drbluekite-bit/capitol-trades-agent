@@ -50,6 +50,7 @@ import com.velodromeghost.app.RaceViewModel
 import com.velodromeghost.app.data.ResistanceMode
 import com.velodromeghost.app.ui.OverviewRenderer.drawOverview
 import com.velodromeghost.app.ui.PovRenderer.drawPov
+import com.velodromeghost.core.race.BleepProgress
 import com.velodromeghost.core.race.Competitor
 import com.velodromeghost.core.race.GhostSnapshot
 import com.velodromeghost.core.race.RaceMode
@@ -193,8 +194,10 @@ private fun PovPanel(st: RaceState, track: Track, resistance: ResistanceMode, wo
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Column(Modifier.hud(), horizontalAlignment = Alignment.CenterHorizontally) {
+                val bleep = st.bleep
                 Text(
-                    "LAP ${st.currentLap}/${st.totalLaps}",
+                    if (bleep != null) "LEVEL ${bleep.level} · ${bleep.levelWatts.roundToInt()} W"
+                    else "LAP ${st.currentLap}/${st.totalLaps}",
                     color = Color.White,
                     fontWeight = FontWeight.Black,
                     fontSize = 18.sp,
@@ -253,10 +256,16 @@ private fun OverviewPanel(st: RaceState, track: Track) {
     val measurer = rememberTextMeasurer()
     Column(Modifier.fillMaxSize().background(Color(0xFF0B1020)).padding(8.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Small("%.0f m to go".format(st.distanceToGo), Color.White)
+            val bleep = st.bleep
+            Small(
+                if (bleep != null) "Level ${bleep.level} ends in %.0f m · %d done".format(bleep.ghostMetersToLevelEnd, bleep.completedLevels)
+                else "%.0f m to go".format(st.distanceToGo),
+                Color.White,
+            )
             Small(formatDuration(st.elapsedSec), Color.White)
         }
         Canvas(Modifier.weight(1f).fillMaxWidth()) { drawOverview(st, track, measurer) }
+        st.bleep?.let { BleepStatus(st, it) }
         GapBar(st)
         if (st.mode.isPointsBased) PointsBoard(st)
         if (st.isField) FieldBoard(st)
@@ -336,6 +345,27 @@ private fun PointsBoard(st: RaceState) {
                 Palette.muted,
             )
         }
+    }
+}
+
+@Composable
+private fun BleepStatus(st: RaceState, b: BleepProgress) {
+    val safe = st.gapMeters >= -1.0
+    Row(
+        Modifier.fillMaxWidth().padding(top = 4.dp)
+            .background(if (safe) Color(0xFF1B5E20) else Color(0xFFB71C1C), RoundedCornerShape(8.dp)).padding(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(
+                if (safe) "ON PACE - level ${b.level} safe so far" else "BEHIND - catch the ghost before the level ends!",
+                color = Color.White,
+                fontWeight = FontWeight.Black,
+                fontSize = 15.sp,
+            )
+            Small("Next level: ${b.nextLevelWatts.roundToInt()} W", Color.White)
+        }
+        Big("${b.completedLevels}", "levels", Color.White, size = 30.sp)
     }
 }
 

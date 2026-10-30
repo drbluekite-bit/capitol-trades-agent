@@ -92,7 +92,7 @@ fun SetupScreen(vm: RaceViewModel) {
             )
             ConnectionCard(vm, s)
             RaceTypeCard(vm, s)
-            GhostCard(vm, s)
+            if (s.raceType != RaceType.BLEEP_TEST) GhostCard(vm, s)
             RiderCard(vm, s)
             ResistanceCard(vm, s)
             Section("6 · After the race") {
@@ -281,6 +281,26 @@ private fun RaceTypeCard(vm: RaceViewModel, s: AppSettings) {
                     RadioRow(label, "$laps laps", s.pursuitLaps == laps) { vm.update { it.copy(pursuitLaps = laps) } }
                 }
             }
+            RaceType.BLEEP_TEST -> {
+                Stepper("Laps per level", s.bleepLevelLaps, 1..8, suffix = " (${s.bleepLevelLaps * 250} m)") { v ->
+                    vm.update { it.copy(bleepLevelLaps = v) }
+                }
+                Stepper("First level", s.bleepStartPct, 30..120, step = 5, suffix = "% (${s.bleepStartWatts} W)") { v ->
+                    vm.update { it.copy(bleepStartPct = v) }
+                }
+                Stepper("Add each level", s.bleepStepWatts, 5..30, step = 5, suffix = " W") { v ->
+                    vm.update { it.copy(bleepStepWatts = v) }
+                }
+                Text(
+                    "Level 1 = ${s.bleepStartWatts} W, level 2 = ${s.bleepStartWatts + s.bleepStepWatts} W, " +
+                        "level 3 = ${s.bleepStartWatts + 2 * s.bleepStepWatts} W ... Be level with (within 1 m) or ahead of " +
+                        "the ghost when it finishes each level. No drafting, and a lead isn't carried into the next level. " +
+                        "Keep these settings the same each month so your results compare.",
+                    fontSize = 12.sp,
+                    color = Palette.muted,
+                )
+                BleepHistorySummary(vm)
+            }
             RaceType.OMNIUM -> {
                 RadioRow(
                     "Club length",
@@ -404,6 +424,26 @@ private fun ResistanceCard(vm: RaceViewModel, s: AppSettings) {
     Section("5 · SmartSpin2k resistance") {
         ResistanceMode.entries.forEach { mode ->
             RadioRow(mode.label, mode.help, s.resistance == mode) { vm.update { it.copy(resistance = mode) } }
+        }
+    }
+}
+
+@Composable
+private fun BleepHistorySummary(vm: RaceViewModel) {
+    val history by vm.bleepHistory.collectAsStateWithLifecycle()
+    HorizontalDivider()
+    Text("Your bleep tests", fontWeight = FontWeight.Bold)
+    if (history.isEmpty()) {
+        Text("No tests yet - your first one sets the baseline.", fontSize = 13.sp, color = Palette.muted)
+        return
+    }
+    BleepChart(history)
+    val fmt = java.text.SimpleDateFormat("d MMM yyyy", java.util.Locale.UK)
+    history.takeLast(5).reversed().forEach { r ->
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(fmt.format(java.util.Date(r.timestampMs)), Modifier.weight(1f), color = Palette.muted, fontSize = 13.sp)
+            Text("Level ${r.level} · ${r.watts.roundToInt()} W", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+            TextButton(onClick = { vm.deleteBleepResult(r) }) { Text("Delete", color = Palette.bad, fontSize = 12.sp) }
         }
     }
 }

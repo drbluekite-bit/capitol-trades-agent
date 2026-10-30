@@ -23,13 +23,21 @@ enum class RaceMode(val label: String) {
     MADISON("Madison"),
 
     /** Start on opposite sides of the track; best time wins, or catch the ghost to win outright. */
-    INDIVIDUAL_PURSUIT("Individual pursuit");
+    INDIVIDUAL_PURSUIT("Individual pursuit"),
+
+    /**
+     * Fitness test: the ghost rides a fixed power for a level (e.g. 4 laps), then steps up (e.g. +10 W).
+     * Be level with or ahead of it at the end of each level to go on; the test ends at the first level you miss.
+     */
+    BLEEP_TEST("Bleep test");
+
+    val isBleepTest: Boolean get() = this == BLEEP_TEST
 
     val isPointsBased: Boolean get() = this == TEMPO || this == POINTS_RACE || this == MADISON
     val isPursuit: Boolean get() = this == INDIVIDUAL_PURSUIT
 
     /** Bunch races that can be ridden against a whole field of ghosts. */
-    val supportsField: Boolean get() = this != SPRINT_1V1 && this != INDIVIDUAL_PURSUIT
+    val supportsField: Boolean get() = this != SPRINT_1V1 && this != INDIVIDUAL_PURSUIT && this != BLEEP_TEST
 }
 
 /** Names (and, in the app, colours) for the ghosts in a field. */
@@ -84,6 +92,12 @@ data class RaceConfig(
     val seed: Long = 1L,
     /** Elimination race: the last rider over the line every N laps is out. */
     val eliminationEveryLaps: Int = 2,
+    /** Bleep test: laps per level, the first level's power, and the step between levels. */
+    val bleepLevelLaps: Int = 4,
+    val bleepStartWatts: Double = 120.0,
+    val bleepStepWatts: Double = 10.0,
+    /** Bleep test: how far behind the ghost (m) still counts as level at the end of a level. */
+    val bleepToleranceMeters: Double = 1.0,
     val countdownSeconds: Double = 3.0,
     val track: Track = Track(),
 ) {
@@ -252,6 +266,8 @@ data class RaceState(
     /** Your place on the road (by distance) among riders still racing. */
     val roadPosition: Int = 1,
     val fieldSize: Int = 1,
+    /** Bleep test progress (null for other races). */
+    val bleep: BleepProgress? = null,
 ) {
     val isField: Boolean get() = fieldSize > 1
     val ridersRacing: Int get() = 1 + ghosts.count { !it.eliminated } - if (standings.any { it.isYou && it.eliminated }) 1 else 0
@@ -261,3 +277,20 @@ data class RaceState(
     val riderTotalPoints: Int get() = riderSprintPoints + riderLapPoints
     val ghostTotalPoints: Int get() = ghostSprintPoints + ghostLapPoints
 }
+
+/** Live state of a bleep test. */
+data class BleepProgress(
+    /** The level being ridden now (1-based). */
+    val level: Int,
+    val levelWatts: Double,
+    val nextLevelWatts: Double,
+    /** Levels passed so far: the score if the test ends now. */
+    val completedLevels: Int,
+    /** Power of the last level passed (0 if none). */
+    val lastPassedWatts: Double,
+    /** Metres the ghost still has to ride in this level. */
+    val ghostMetersToLevelEnd: Double,
+    val levelMeters: Double,
+    /** Once failed: how far behind the ghost you were at the end of the level. */
+    val failedByMeters: Double?,
+)

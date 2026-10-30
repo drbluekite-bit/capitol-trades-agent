@@ -106,6 +106,13 @@ class RaceEngine(val config: RaceConfig) {
     private var lastAnnouncedLap = 0
     private var ghostFinishAnnounced = false
 
+    // Bleep test
+    private val levelMeters = config.bleepLevelLaps.coerceAtLeast(1) * lap
+    private var bleepLevel = 1
+    private var levelStart = 0.0
+    private var bleepFailGap: Double? = null
+    private var lastLevelLapAnnounced = 0
+
     private var winnerId: Int? = null
     private var margin: Double? = null
     private var caughtBy: Competitor? = null
@@ -155,7 +162,8 @@ class RaceEngine(val config: RaceConfig) {
 
         val racing = everyone.filter { it.active }
         for (r in racing) {
-            if (mode.isPursuit) {
+            // No drafting in a pursuit (half a lap apart) or a fitness test.
+            if (mode.isPursuit || mode.isBleepTest) {
                 r.drafting = false
                 r.dragFactor = 1.0
                 continue
@@ -184,6 +192,10 @@ class RaceEngine(val config: RaceConfig) {
         checkMadisonChange()
         checkSprints()
         checkEliminations()
+        if (mode.isBleepTest) {
+            checkBleepLevel()
+            return
+        }
         if (phase != RacePhase.RACING) return
         checkLapGains()
         checkLapAnnouncements()
@@ -205,7 +217,10 @@ class RaceEngine(val config: RaceConfig) {
         g.level = g.levelFrom + (g.levelTo - g.levelFrom) * t
     }
 
+    private fun bleepWatts(level: Int) = config.bleepStartWatts + (level - 1) * config.bleepStepWatts
+
     private fun ghostPower(g: Racer): Double {
+        if (mode.isBleepTest) return bleepWatts(bleepLevel)
         // A field rider's wandering level *is* its riding power (fraction of your FTP).
         // A lone ghost rides its pacing (workout or constant %) scaled by its strength.
         val ftp = if (isField) config.riderFtpWatts else config.riderFtpWatts * g.level
@@ -392,6 +407,56 @@ class RaceEngine(val config: RaceConfig) {
         }
     }
 
+    // ------------------------------------------------------------------ bleep test
+
+    /**
+     * When the ghost reaches the end of the level you must be level with it (within the tolerance) or
+     * ahead. Pass, and the next level starts from where you are (any lead isn't banked: the ghost
+     * re-syncs to you, like waiting for the beep). Miss, and the test is over.
+     */
+    private fun checkBleepLevel() {
+        val levelEnd = levelStart + levelMeters
+        val lapsIn = ((firstGhost.dist - levelStart) / lap).toInt()
+        if (lapsIn > lastLevelLapAnnounced && firstGhost.dist < levelEnd) {
+            lastLevelLapAnnounced = lapsIn
+            val left = config.bleepLevelLaps - lapsIn
+            announce(if (left == 1) "Last lap of level $bleepLevel!" else "Level $bleepLevel: $left laps to go")
+        }
+        if (firstGhost.dist < levelEnd) return
+        val behind = levelEnd - you.dist
+        if (behind <= config.bleepToleranceMeters) {
+            bleepLevel++
+            levelStart = max(you.dist, levelEnd)
+            firstGhost.dist = levelStart
+            you.dist = max(you.dist, levelStart - config.bleepToleranceMeters)
+            lastLevelLapAnnounced = 0
+            announce("Level ${bleepLevel - 1} done! Level $bleepLevel: ${bleepWatts(bleepLevel).toInt()} W")
+        } else {
+            bleepFailGap = behind
+            firstGhost.finish = elapsed
+            you.finish = elapsed
+            announce("Test over - you reached level ${bleepLevel - 1}")
+            phase = RacePhase.FINISHED
+            winnerId = if (bleepLevel > 1) 0 else firstGhost.id
+            margin = null
+        }
+    }
+
+    private fun bleepProgress(): BleepProgress? {
+        if (!mode.isBleepTest) return null
+        val completed = bleepLevel - 1
+        return BleepProgress(
+            level = bleepLevel,
+            levelWatts = bleepWatts(bleepLevel),
+            nextLevelWatts = bleepWatts(bleepLevel + 1),
+            completedLevels = completed,
+            lastPassedWatts = if (completed > 0) bleepWatts(completed) else 0.0,
+            ghostMetersToLevelEnd = (levelStart + levelMeters - firstGhost.dist).coerceAtLeast(0.0),
+            levelMeters = levelMeters,
+            failedByMeters = bleepFailGap,
+        )
+    }
+
     // ------------------------------------------------------------------ finishing
 
     private fun checkCatch() {
@@ -522,9 +587,9 @@ class RaceEngine(val config: RaceConfig) {
             ghost = primary.snapshot(),
             gapMeters = gap,
             gapSeconds = gapSec,
-            raceDistanceMeters = raceDistance,
+            raceDistanceMeters = if (mode.isBleepTest) levelStart + levelMeters else raceDistance,
             lapLength = lap,
-            totalLaps = config.effectiveLaps,
+            totalLaps = if (mode.isBleepTest) config.bleepLevelLaps else config.effectiveLaps,
             sprints = sprints.toList(),
             nextSprintLap = nextLine?.let { (it / lap).toInt() },
             riderSprintPoints = you.sprintPoints,
@@ -547,6 +612,7 @@ class RaceEngine(val config: RaceConfig) {
             riderPlace = standings.first { it.isYou }.place,
             roadPosition = 1 + racingGhosts.count { it.dist > you.dist },
             fieldSize = ghostCount,
+            bleep = bleepProgress(),
         )
     }
 

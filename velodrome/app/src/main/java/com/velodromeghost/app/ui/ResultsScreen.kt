@@ -39,7 +39,11 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.velodromeghost.app.Palette
 import com.velodromeghost.app.RaceSession
 import com.velodromeghost.app.RaceViewModel
+import com.velodromeghost.core.race.BleepProgress
+import com.velodromeghost.core.race.BleepTest
+import com.velodromeghost.core.race.BleepTrendDirection
 import com.velodromeghost.core.race.Omnium
+import com.velodromeghost.core.race.RaceState
 import com.velodromeghost.core.race.Competitor
 import com.velodromeghost.core.race.RaceMode
 import com.velodromeghost.core.race.RacePhase
@@ -130,8 +134,11 @@ fun ResultsScreen(vm: RaceViewModel) {
             Modifier.widthIn(max = 640.dp).fillMaxWidth().verticalScroll(rememberScrollState()).padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            val bleep = st?.bleep
             if (st == null) {
                 Text("No race yet")
+            } else if (bleep != null) {
+                BleepResults(vm, st, bleep)
             } else {
                 val finished = st.phase == RacePhase.FINISHED
                 val youWon = st.winner == Competitor.RIDER
@@ -239,6 +246,53 @@ fun ResultsScreen(vm: RaceViewModel) {
                 OutlinedButton(onClick = { vm.backToSetup() }) { Text("Change setup") }
             }
         }
+    }
+}
+
+@Composable
+private fun BleepResults(vm: RaceViewModel, st: RaceState, b: BleepProgress) {
+    val outcome by vm.bleepOutcome.collectAsStateWithLifecycle()
+    val history by vm.bleepHistory.collectAsStateWithLifecycle()
+    val settings by vm.settings.collectAsStateWithLifecycle()
+    Text("BLEEP TEST", color = Palette.muted, fontWeight = FontWeight.Bold)
+    Text("LEVEL ${b.completedLevels}", fontSize = 56.sp, fontWeight = FontWeight.Black, color = Palette.rider)
+    if (b.completedLevels > 0) {
+        val pct = (b.lastPassedWatts * 100 / settings.ftpWatts).roundToInt()
+        val wkg = b.lastPassedWatts / settings.riderWeightKg.coerceAtLeast(1)
+        Text(
+            "Last level passed: ${b.lastPassedWatts.roundToInt()} W  ($pct% FTP, %.2f W/kg)".format(wkg),
+            fontSize = 18.sp,
+            color = Color.White,
+        )
+    }
+    b.failedByMeters?.let {
+        Text(
+            "Missed level ${b.level} (${b.levelWatts.roundToInt()} W) by %.1f m".format(it),
+            color = Palette.muted,
+        )
+    } ?: Text("Stopped during level ${b.level} (${b.levelWatts.roundToInt()} W)", color = Palette.muted)
+    Line("Time", formatTime(st.elapsedSec))
+    outcome?.let { (_, trend) ->
+        HorizontalDivider()
+        val color = when (trend.direction) {
+            BleepTrendDirection.IMPROVING -> Palette.good
+            BleepTrendDirection.REGRESSING -> Palette.bad
+            else -> Palette.accent
+        }
+        Text(trend.direction.label, fontSize = 26.sp, fontWeight = FontWeight.Black, color = color)
+        trend.previous?.let { prev ->
+            val fmt = java.text.SimpleDateFormat("d MMM yyyy", java.util.Locale.UK)
+            Text(
+                "${BleepTest.describeChange(trend)} since ${fmt.format(java.util.Date(prev.timestampMs))} (level ${prev.level})",
+                color = Color.White,
+            )
+        }
+        trend.best?.let { Line("Best ever", "Level ${it.level} · ${it.watts.roundToInt()} W") }
+        if (settings.demoMode) Text("Demo mode: this test wasn't saved to your history.", fontSize = 12.sp, color = Palette.muted)
+    }
+    if (history.isNotEmpty()) {
+        Text("History", fontWeight = FontWeight.Bold, color = Palette.accent)
+        BleepChart(history)
     }
 }
 

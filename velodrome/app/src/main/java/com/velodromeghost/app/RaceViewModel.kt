@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import com.velodromeghost.app.ble.BleManager
 import com.velodromeghost.app.ble.ConnectionState
 import com.velodromeghost.app.data.AppSettings
+import com.velodromeghost.app.data.BleepHistoryStore
 import com.velodromeghost.app.data.ResistanceMode
 import com.velodromeghost.app.data.SettingsStore
 import com.velodromeghost.app.data.WorkoutEntry
@@ -17,6 +18,9 @@ import com.velodromeghost.core.fit.RideRecorder
 import com.velodromeghost.core.fit.RideSummary
 import com.velodromeghost.core.physics.Physics
 import com.velodromeghost.core.physics.RiderParams
+import com.velodromeghost.core.race.BleepResult
+import com.velodromeghost.core.race.BleepTest
+import com.velodromeghost.core.race.BleepTrend
 import com.velodromeghost.core.race.Competitor
 import com.velodromeghost.core.race.Omnium
 import com.velodromeghost.core.race.RaceConfig
@@ -98,6 +102,18 @@ class RaceViewModel(app: Application) : AndroidViewModel(app) {
     /** Set when a race finishes and the ride should be sent to ChatGPT automatically. */
     private val _autoSendPending = MutableStateFlow(false)
     val autoSendPending: StateFlow<Boolean> = _autoSendPending.asStateFlow()
+
+    private val bleepStore = BleepHistoryStore(app)
+    private val _bleepHistory = MutableStateFlow(bleepStore.load())
+    val bleepHistory: StateFlow<List<BleepResult>> = _bleepHistory.asStateFlow()
+
+    /** The bleep test just ridden and how it compares with earlier ones. */
+    private val _bleepOutcome = MutableStateFlow<Pair<BleepResult, BleepTrend>?>(null)
+    val bleepOutcome: StateFlow<Pair<BleepResult, BleepTrend>?> = _bleepOutcome.asStateFlow()
+
+    fun deleteBleepResult(result: BleepResult) {
+        _bleepHistory.value = bleepStore.delete(result)
+    }
 
     private val _session = MutableStateFlow<RaceSession?>(null)
     val session: StateFlow<RaceSession?> = _session.asStateFlow()
@@ -213,6 +229,9 @@ class RaceViewModel(app: Application) : AndroidViewModel(app) {
                 fieldMinLevel = s.fieldMinPct / 100.0,
                 fieldMaxLevel = s.fieldMaxPct / 100.0,
                 seed = System.nanoTime(),
+                bleepLevelLaps = s.bleepLevelLaps,
+                bleepStartWatts = s.bleepStartWatts.toDouble(),
+                bleepStepWatts = s.bleepStepWatts.toDouble(),
             )
             track = config.track
             val newEngine = RaceEngine(config)
@@ -220,6 +239,7 @@ class RaceViewModel(app: Application) : AndroidViewModel(app) {
             _paused.value = false
             recorder = RideRecorder()
             _ride.value = null
+            _bleepOutcome.value = null
             _autoSendPending.value = false
             raceStartUnixMs = 0L
             _race.value = newEngine.tick(0.0, 0.0, null)
@@ -269,6 +289,7 @@ class RaceViewModel(app: Application) : AndroidViewModel(app) {
                         finishedAt = now
                         releaseResistance(s)
                         recordResult(state)
+                        recordBleep(state, s)
                         val sessionDone = _session.value?.isLastEvent != false
                         if (s.autoSendToChatGpt && !s.demoMode && !recorder.isEmpty && sessionDone) {
                             _autoSendPending.value = true
@@ -352,6 +373,7 @@ class RaceViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 appendLine("Race: $type, ${st.totalLaps} laps (${st.raceDistanceMeters.roundToInt()} m)")
                 val result = when {
+                    st.mode.isBleepTest -> "level ${st.bleep?.completedLevels ?: 0} completed"
                     st.phase != RacePhase.FINISHED -> "abandoned"
                     st.winner == Competitor.RIDER -> "I won" + (st.marginSeconds?.let { " by %.2f s".format(Locale.UK, it) } ?: "")
                     st.isField -> "${st.standings.first().name} won, I was ${st.riderPlace} of ${st.standings.size}"
@@ -367,6 +389,14 @@ class RaceViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 if (st.mode.isPointsBased) {
                     appendLine("Points: me ${st.riderTotalPoints}, ghost ${st.ghostTotalPoints} (sprints won ${st.sprints.count { it.winner == Competitor.RIDER }}/${st.sprints.size})")
+                }
+            }
+            _bleepOutcome.value?.let { (result, trend) ->
+                appendLine("Bleep test: reached level ${result.level} (last level ${result.watts.roundToInt()} W = ${(result.watts * 100 / s.ftpWatts).roundToInt()}% FTP, %.2f W/kg). Levels of ${s.bleepLevelLaps} laps starting at ${s.bleepStartWatts} W, +${s.bleepStepWatts} W per level.".format(Locale.UK, result.wattsPerKg))
+                appendLine("Compared with last test: ${BleepTest.describeChange(trend)} - ${trend.direction.label}")
+                val past = _bleepHistory.value.filter { it.timestampMs != result.timestampMs }.takeLast(6)
+                if (past.isNotEmpty()) {
+                    appendLine("Previous tests: " + past.joinToString { SimpleDateFormat("d MMM yy", Locale.UK).format(Date(it.timestampMs)) + " level ${it.level}" })
                 }
             }
             _session.value?.takeIf { it.isOmnium }?.let { session ->
@@ -433,6 +463,24 @@ class RaceViewModel(app: Application) : AndroidViewModel(app) {
         if (s.resistance != ResistanceMode.OFF) ble.setSimulation(0.0, SIM_CRR, simCw(false) / 100.0)
     }
 
+    /** Saves a finished bleep test to the history (demo-mode tests are shown but not saved). */
+    private fun recordBleep(state: RaceState, s: AppSettings) {
+        val b = state.bleep ?: return
+        val result = BleepResult(
+            timestampMs = System.currentTimeMillis(),
+            level = b.completedLevels,
+            watts = b.lastPassedWatts,
+            ftpWatts = s.ftpWatts,
+            weightKg = s.riderWeightKg,
+            startWatts = s.bleepStartWatts.toDouble(),
+            stepWatts = s.bleepStepWatts.toDouble(),
+            levelLaps = s.bleepLevelLaps,
+        )
+        val history = if (s.demoMode) _bleepHistory.value + result else bleepStore.add(result)
+        if (!s.demoMode) _bleepHistory.value = history
+        _bleepOutcome.value = result to BleepTest.trend(history, result)
+    }
+
     /** Stores this event's result in the session (once). */
     private fun recordResult(state: RaceState) {
         val session = _session.value ?: return
@@ -451,6 +499,10 @@ class RaceViewModel(app: Application) : AndroidViewModel(app) {
         val st = _race.value
         val finished = st != null && st.phase == RacePhase.FINISHED
         if (st != null) recordResult(st)
+        // Stopping a bleep test part-way still counts: your score is the levels completed.
+        if (st != null && st.bleep != null && _bleepOutcome.value == null && st.phase != RacePhase.COUNTDOWN) {
+            recordBleep(st, _settings.value)
+        }
         if (!recorder.isEmpty) _ride.value = recorder.summary()
         // Even an abandoned race can be exported if you rode some of it.
         _screen.value = if (finished || !recorder.isEmpty) Screen.RESULTS else Screen.SETUP

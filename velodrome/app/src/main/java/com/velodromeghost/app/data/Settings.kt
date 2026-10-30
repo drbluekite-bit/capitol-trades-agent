@@ -24,6 +24,10 @@ enum class RaceType(val label: String, val help: String) {
         "Individual pursuit",
         "You and the ghost start on opposite sides of the track. Fastest time wins, or catch the ghost to win outright.",
     ),
+    BLEEP_TEST(
+        "Bleep test (fitness test)",
+        "The ghost rides a set power for each level, then steps up. Stay level or ahead at the end of every level; your score is the last level you complete.",
+    ),
     OMNIUM(
         "Omnium",
         "Four races in one session: scratch, tempo, elimination and points race. 40 / 38 points per race, points-race points added on top.",
@@ -48,6 +52,10 @@ data class AppSettings(
     val fieldSize: Int = 6,
     val fieldMinPct: Int = 60,
     val fieldMaxPct: Int = 125,
+    /** Bleep test: laps per level, first level as % of FTP, watts added per level. */
+    val bleepLevelLaps: Int = 4,
+    val bleepStartPct: Int = 60,
+    val bleepStepWatts: Int = 10,
     val ghostStrengthPct: Int = 100,
     val constantPacePct: Int = 85,
     val ghostAttacks: Boolean = true,
@@ -72,7 +80,10 @@ data class AppSettings(
         RaceType.MADISON -> listOf(Omnium.Event(RaceMode.MADISON, madisonLaps))
         RaceType.INDIVIDUAL_PURSUIT -> listOf(Omnium.Event(RaceMode.INDIVIDUAL_PURSUIT, pursuitLaps))
         RaceType.OMNIUM -> Omnium.events(omniumFull)
+        RaceType.BLEEP_TEST -> listOf(Omnium.Event(RaceMode.BLEEP_TEST, bleepLevelLaps))
     }
+
+    val bleepStartWatts: Int get() = ftpWatts * bleepStartPct / 100
 }
 
 class SettingsStore(context: Context) {
@@ -97,6 +108,9 @@ class SettingsStore(context: Context) {
             fieldSize = prefs.getInt("fieldSize", d.fieldSize),
             fieldMinPct = prefs.getInt("fieldMin", d.fieldMinPct),
             fieldMaxPct = prefs.getInt("fieldMax", d.fieldMaxPct),
+            bleepLevelLaps = prefs.getInt("bleepLaps", d.bleepLevelLaps),
+            bleepStartPct = prefs.getInt("bleepStart", d.bleepStartPct),
+            bleepStepWatts = prefs.getInt("bleepStep", d.bleepStepWatts),
             sprintEveryLaps = prefs.getInt("sprintEvery", d.sprintEveryLaps),
             ghostStrengthPct = prefs.getInt("ghostStrength", d.ghostStrengthPct),
             constantPacePct = prefs.getInt("constantPace", d.constantPacePct),
@@ -128,6 +142,9 @@ class SettingsStore(context: Context) {
             .putInt("fieldSize", s.fieldSize)
             .putInt("fieldMin", s.fieldMinPct)
             .putInt("fieldMax", s.fieldMaxPct)
+            .putInt("bleepLaps", s.bleepLevelLaps)
+            .putInt("bleepStart", s.bleepStartPct)
+            .putInt("bleepStep", s.bleepStepWatts)
             .putInt("sprintEvery", s.sprintEveryLaps)
             .putInt("ghostStrength", s.ghostStrengthPct)
             .putInt("constantPace", s.constantPacePct)

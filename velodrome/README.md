@@ -13,6 +13,13 @@ A simple Android app for racing a pace-setting **ghost rider** round a 250 m vel
   - **Madison:** a points race ridden as a two-rider relay. You and a virtual partner take turns, swapping with a hand-sling every ½–4 laps (the incoming rider gets a push). On your partner's turn, ease off and recover (ERG drops to 50 % FTP). The screen shows whose turn it is and the metres to the next sling. Your partner's strength is adjustable.
   - **Individual pursuit:** you and the ghost start on opposite sides of the track (125 m apart) over 2, 3 or 4 km. Best time wins, or catch the ghost to win on the spot. There's no drafting, and the gap is shown in seconds.
   - **Omnium:** four races in one session: *scratch* (first across the line), *tempo* (1 point for winning each lap from lap 5, +20 for a lap gain), *elimination*, and a final *points race*. The first three pay 40 points to the winner and 38 to second, and points-race points are added on top. Club or full length. With only one ghost, the elimination is decided at the first elimination sprint after 2 laps.
+- **Bleep test (fitness test).** The ghost rides a fixed power for each level (default 4 laps =
+  1 km at 60 % of your FTP), then steps up 10 W.
+  - **Passing:** be level with it (within 1 m) or ahead when it finishes the level to go on to the next.
+  - **Scoring:** the test ends at the first level you miss, and your score is the last level you completed.
+  - **Fairness:** there's no drafting, and a lead isn't carried into the next level (the ghost re-syncs to you, like waiting for the beep).
+  - **History:** results are saved with the date. The results screen says whether you're getting fitter, holding steady or dropping off compared with your last test, and shows your history on a chart. Tapping **End** mid-test still records the levels you completed.
+  - **Comparing:** keep the settings the same from month to month so the results compare. Tests ridden with different settings aren't compared.
 - **Race against a field.** In the points race, Madison and omnium you can race up to 11 ghosts.
   Each one rides at a power that wanders randomly within a range you set (default **60–125 % of
   your FTP**), changing every 20–75 s, so riders surge and fade through the race.
@@ -144,6 +151,33 @@ speed, distance), plus a lap and a session summary marked as indoor cycling.
 | Calories | Total work ÷ 4.184 ÷ 24 % efficiency, the usual bike-computer estimate (about 1 kcal per kJ) |
 
 Ride time is race time, so pauses don't count. The countdown isn't recorded.
+
+## Publishing to Netlify and Firebase (optional)
+
+On every push, the GitHub build can also put the app on a **Netlify download page** and send it
+through **Firebase App Distribution** (phone notification, one tap to install). Each step stays
+switched off until its settings exist in the GitHub repo under **Settings → Secrets and variables → Actions**.
+
+**Netlify (download page):**
+1. In Netlify: **Add new site → Deploy manually** and drop in any small folder (it gets replaced).
+   Rename it under **Site configuration → Change site name**, e.g. `velodrome-ghost`.
+2. Copy the **Site ID** (Site configuration → General → Site details).
+3. Create a token: **User settings → Applications → Personal access tokens → New access token**.
+4. In GitHub, add a **variable** `NETLIFY_SITE_ID` (the Site ID) and a **secret** `NETLIFY_AUTH_TOKEN` (the token).
+
+The page is public to anyone who has the link, and isn't indexed by search engines.
+
+**Firebase App Distribution (install from a notification):**
+1. Firebase console → your project → **Add app → Android**, package name `com.velodromeghost.app`.
+   You can skip the `google-services.json` and SDK steps.
+2. Copy the **App ID** (Project settings → Your apps, looks like `1:123…:android:abc…`).
+3. **Release & Monitor → App Distribution → Get started**. Under **Testers & Groups**, create a group
+   (e.g. `me`) and add your email.
+4. **Project settings → Service accounts → Generate new private key** (downloads a JSON file).
+5. In GitHub, add a **variable** `FIREBASE_APP_ID` (the App ID), a **secret** `FIREBASE_SERVICE_ACCOUNT`
+   (paste the whole JSON file), and, if your group isn't called `me`, a **variable** `FIREBASE_GROUPS` (the
+   group's alias).
+6. On the phone, accept the tester invite email. You'll get a notification for each new build after that.
 
 ## Building it yourself
 

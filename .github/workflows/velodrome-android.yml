@@ -17,6 +17,14 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      # Optional publishing targets: each step below is skipped until these are set in
+      # Settings -> Secrets and variables -> Actions (see velodrome/README.md).
+      NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+      NETLIFY_SITE_ID: ${{ vars.NETLIFY_SITE_ID }}
+      FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+      FIREBASE_APP_ID: ${{ vars.FIREBASE_APP_ID }}
+      FIREBASE_GROUPS: ${{ vars.FIREBASE_GROUPS }}
     defaults:
       run:
         working-directory: velodrome
@@ -59,3 +67,22 @@ jobs:
             Download `velodrome-ghost.apk` below on your phone and open it to install
             (allow "install unknown apps" for your browser / My Files; turn off Samsung Auto Blocker if it blocks it).
           files: velodrome/velodrome-ghost.apk
+
+      - name: Deploy download page to Netlify
+        if: github.event_name != 'pull_request' && env.NETLIFY_AUTH_TOKEN != '' && env.NETLIFY_SITE_ID != ''
+        run: |
+          mkdir -p site-out
+          cp site/index.html site/_headers velodrome-ghost.apk site-out/
+          sed -i "s/__BUILD__/${{ github.run_number }}/; s/__DATE__/$(date -u '+%d %b %Y %H:%M UTC')/; s/__SHA__/${GITHUB_SHA::7}/" site-out/index.html
+          npx --yes netlify-cli@17 deploy --dir=site-out --prod --message "Build #${{ github.run_number }}"
+
+      - name: Send to Firebase App Distribution
+        if: github.event_name != 'pull_request' && env.FIREBASE_SERVICE_ACCOUNT != '' && env.FIREBASE_APP_ID != ''
+        run: |
+          printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "$RUNNER_TEMP/firebase-sa.json"
+          GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/firebase-sa.json" npx --yes firebase-tools@13 \
+            appdistribution:distribute velodrome-ghost.apk \
+            --app "$FIREBASE_APP_ID" \
+            --groups "${FIREBASE_GROUPS:-me}" \
+            --release-notes "Velodrome Ghost build #${{ github.run_number }} ($(git log -1 --pretty=%s))"
+          rm -f "$RUNNER_TEMP/firebase-sa.json"
