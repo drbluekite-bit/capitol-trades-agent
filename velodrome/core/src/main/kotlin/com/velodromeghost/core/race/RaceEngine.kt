@@ -572,6 +572,7 @@ class RaceEngine(val config: RaceConfig) {
         }
 
         val riderTarget = when {
+            mode.isBleepTest -> bleepWatts(bleepLevel)
             partnerActive -> 0.5 * config.riderFtpWatts
             else -> config.workout?.targetWatts(elapsed, config.riderFtpWatts)
                 ?: (config.constantGhostFraction * config.riderFtpWatts)

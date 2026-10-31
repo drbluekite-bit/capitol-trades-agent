@@ -76,3 +76,16 @@ class BleepTestTest {
         assertEquals(BleepTrendDirection.FIRST, BleepTest.trend(listOf(a, b, c, d, other), other).direction)
     }
 }
+
+class BleepErgTargetTest {
+    @org.junit.Test
+    fun ergTargetIsTheLevelPower() {
+        val engine = com.velodromeghost.core.race.RaceEngine(
+            com.velodromeghost.core.race.RaceConfig(mode = com.velodromeghost.core.race.RaceMode.BLEEP_TEST, bleepStartWatts = 120.0, bleepStepWatts = 10.0),
+        )
+        var s = engine.tick(3.1, 0.0, null)
+        org.junit.Assert.assertEquals(120.0, s.riderTargetWatts, 1e-9)
+        while (s.bleep!!.completedLevels == 0) s = engine.tick(0.05, 300.0, null)
+        org.junit.Assert.assertEquals(130.0, s.riderTargetWatts, 1e-9)
+    }
+}

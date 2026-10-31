@@ -200,7 +200,8 @@ class RaceViewModel(app: Application) : AndroidViewModel(app) {
         val s = _settings.value
         val event = session.current
         viewModelScope.launch {
-            val workout = s.workoutId?.let { id ->
+            // The bleep test has its own fixed levels: race pacing workouts don't apply.
+            val workout = s.workoutId?.takeIf { !event.mode.isBleepTest }?.let { id ->
                 try {
                     withContext(Dispatchers.IO) { repo.load(id) }
                 } catch (e: Exception) {

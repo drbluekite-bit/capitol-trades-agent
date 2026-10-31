@@ -219,18 +219,19 @@ private fun PovPanel(st: RaceState, track: Track, resistance: ResistanceMode, wo
                 )
                 Small("hand-sling in %.0f m".format(toChange), Color.White)
             }
-            val showAnnouncement = st.announcement != null && st.elapsedSec - st.announcementAtSec < 4.0
-            if (showAnnouncement) {
-                Text(
-                    st.announcement.orEmpty(),
-                    Modifier.padding(top = 6.dp).widthIn(max = 320.dp)
-                        .background(Color(0xDD000000), RoundedCornerShape(8.dp)).padding(horizontal = 12.dp, vertical = 6.dp),
-                    color = Palette.accent,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 18.sp,
-                    textAlign = TextAlign.Center,
-                )
-            }
+        }
+        // Announcements sit on the track view, clear of the number panels.
+        val showAnnouncement = st.announcement != null && st.elapsedSec - st.announcementAtSec < 4.0
+        if (showAnnouncement) {
+            Text(
+                st.announcement.orEmpty(),
+                Modifier.align(Alignment.Center).padding(horizontal = 16.dp).widthIn(max = 360.dp)
+                    .background(Color(0xDD000000), RoundedCornerShape(8.dp)).padding(horizontal = 14.dp, vertical = 8.dp),
+                color = Palette.accent,
+                fontWeight = FontWeight.Black,
+                fontSize = 22.sp,
+                textAlign = TextAlign.Center,
+            )
         }
         // Where's the ghost if you can't see it?
         val ahead = track.wrappedDelta(st.rider.distance, st.ghost.distance)
