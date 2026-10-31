@@ -25,6 +25,7 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -104,13 +105,6 @@ fun QueueScreen(
                     }
                 },
                 actions = {
-                    IconButton(
-                        onClick = {
-                            if (hasCameraPermission) onScanDeliveryRun() else cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
-                        },
-                    ) {
-                        Icon(Icons.Filled.PhotoCamera, contentDescription = "Scan delivery run", tint = MaterialTheme.colorScheme.onBackground)
-                    }
                     if (queue.isNotEmpty()) {
                         IconButton(onClick = { showClearConfirm = true }) {
                             Icon(Icons.Filled.DeleteSweep, contentDescription = "Clear queue", tint = MaterialTheme.colorScheme.onBackground)
@@ -144,6 +138,16 @@ fun QueueScreen(
         }
 
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
+            OutlinedButton(
+                onClick = {
+                    if (hasCameraPermission) onScanDeliveryRun() else cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                },
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+            ) {
+                Icon(Icons.Filled.PhotoCamera, contentDescription = null)
+                Text("  Scan a whole delivery run (multiple sheets)")
+            }
+
             if (QUICK_ADD_LOCATIONS.isNotEmpty()) {
                 LazyRow(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),

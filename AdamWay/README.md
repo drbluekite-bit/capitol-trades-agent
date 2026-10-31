@@ -93,7 +93,13 @@ picker tops out at around 10. Black background, white "AW" logo.
    there's no separate short label that drops detail; what you typed or
    picked is exactly what's shown at every stage, overview included.
 11. **Scan a whole delivery run from photographed delivery sheets**, tap
-    the camera icon on the Queue screen. Photograph each sheet one at a
+    the **"Scan a whole delivery run (multiple sheets)"** button at the
+    top of the Queue screen — this is a different button from the
+    "Scan with camera" option on the Add address screen (item 1's single
+    envelope/plaque scan), which just reads one whole address off one
+    photo and puts everything into the address field; don't use that one
+    on a delivery sheet, it'll dump the whole sheet's text into the
+    address box. Photograph each sheet one at a
     time — this is built around one specific, fixed template (two
     deliveries per printed page, a delivery number, an address, and
     Delivery Instructions/CDA Notes boxes), not a generic document
